@@ -3,7 +3,7 @@ import { z } from "zod";
 import { prisma } from "../prisma.js";
 import { requireAuth, type AuthedRequest } from "../middleware/auth.js";
 import { assertMember } from "../lib/access.js";
-import { getBoardState, recordActivity } from "../lib/board.js";
+import { getBoardState, parseLabels, recordActivity } from "../lib/board.js";
 import { isDoneColumn } from "../lib/columns.js";
 import { emitToProject } from "../realtime/io.js";
 
@@ -18,6 +18,8 @@ async function broadcast(projectId: string, userId?: string) {
   return board;
 }
 
+const labelsSchema = z.array(z.string().min(1).max(40)).max(20);
+
 const createSchema = z.object({
   columnId: z.string().min(1),
   title: z.string().min(1).max(200),
@@ -26,6 +28,7 @@ const createSchema = z.object({
   assigneeId: z.string().nullable().optional(),
   estimateHours: z.number().positive().max(1000).nullable().optional(),
   dueDate: z.string().datetime().nullable().optional(),
+  labels: labelsSchema.optional(),
 });
 
 // POST /projects/:projectId/tasks
@@ -57,6 +60,7 @@ tasksRouter.post("/projects/:projectId/tasks", async (req: AuthedRequest, res) =
       assigneeId: data.assigneeId ?? null,
       estimateHours: data.estimateHours ?? null,
       dueDate: data.dueDate ? new Date(data.dueDate) : null,
+      labels: JSON.stringify(data.labels ?? []),
       order: count,
       enteredColumnAt: new Date(),
     },
@@ -81,6 +85,7 @@ const updateSchema = z.object({
   assigneeId: z.string().nullable().optional(),
   estimateHours: z.number().positive().max(1000).nullable().optional(),
   dueDate: z.string().datetime().nullable().optional(),
+  labels: labelsSchema.optional(),
 });
 
 // PATCH /tasks/:taskId
@@ -107,6 +112,7 @@ tasksRouter.patch("/tasks/:taskId", async (req: AuthedRequest, res) => {
       ...(data.dueDate !== undefined
         ? { dueDate: data.dueDate ? new Date(data.dueDate) : null }
         : {}),
+      ...(data.labels !== undefined ? { labels: JSON.stringify(data.labels) } : {}),
     },
   });
 
@@ -197,6 +203,77 @@ tasksRouter.post("/tasks/:taskId/move", async (req: AuthedRequest, res) => {
 
   const board = await broadcast(task.projectId);
   res.json({ board });
+});
+
+// GET /projects/:projectId/tasks/search?q=
+tasksRouter.get("/projects/:projectId/tasks/search", async (req: AuthedRequest, res) => {
+  const { projectId } = req.params;
+  try {
+    await assertMember(req.userId!, projectId);
+  } catch (e: any) {
+    return res.status(e.status ?? 403).json({ error: e.message });
+  }
+  const q = String(req.query.q ?? "").trim();
+  if (!q) return res.json({ results: [] });
+
+  const tasks = await prisma.task.findMany({
+    where: {
+      projectId,
+      OR: [
+        { title: { contains: q } },
+        { description: { contains: q } },
+        { labels: { contains: q } },
+      ],
+    },
+    orderBy: { updatedAt: "desc" },
+    take: 50,
+    include: {
+      column: { select: { id: true, name: true } },
+      assignee: { select: { id: true, name: true, avatarColor: true } },
+    },
+  });
+
+  res.json({
+    results: tasks.map((t) => ({
+      id: t.id,
+      title: t.title,
+      priority: t.priority,
+      labels: parseLabels(t.labels),
+      column: t.column,
+      assignee: t.assignee,
+    })),
+  });
+});
+
+// GET /me/tasks — tasks assigned to the current user across all projects
+tasksRouter.get("/me/tasks", async (req: AuthedRequest, res) => {
+  const tasks = await prisma.task.findMany({
+    where: { assigneeId: req.userId!, completedAt: null },
+    include: {
+      project: { select: { id: true, name: true } },
+      column: { select: { id: true, name: true } },
+    },
+  });
+
+  const mapped = tasks
+    .map((t) => ({
+      id: t.id,
+      title: t.title,
+      priority: t.priority,
+      dueDate: t.dueDate,
+      labels: parseLabels(t.labels),
+      project: t.project,
+      column: t.column,
+    }))
+    .sort((a, b) => {
+      // due date ascending, nulls last
+      if (a.dueDate && b.dueDate) return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+      if (a.dueDate) return -1;
+      if (b.dueDate) return 1;
+      return 0;
+    });
+
+  res.json({ tasks: mapped });
 });
 
 // DELETE /tasks/:taskId

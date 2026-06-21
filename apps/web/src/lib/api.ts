@@ -1,9 +1,12 @@
 import type {
   AnalyticsResult,
   Board,
+  Comment,
   MeetingResult,
+  MyTask,
   Priority,
   ProjectSummary,
+  SearchResult,
   User,
 } from "./types";
 
@@ -119,6 +122,7 @@ export const api = {
       assigneeId?: string | null;
       estimateHours?: number | null;
       dueDate?: string | null;
+      labels?: string[];
     },
   ) =>
     request<{ board: Board }>(`/api/projects/${projectId}/tasks`, {
@@ -135,12 +139,33 @@ export const api = {
       assigneeId: string | null;
       estimateHours: number | null;
       dueDate: string | null;
+      labels: string[];
     }>,
   ) =>
     request<{ board: Board }>(`/api/tasks/${taskId}`, {
       method: "PATCH",
       body: JSON.stringify(data),
     }),
+
+  searchTasks: (projectId: string, q: string) =>
+    request<{ results: SearchResult[] }>(
+      `/api/projects/${projectId}/tasks/search?q=${encodeURIComponent(q)}`,
+    ),
+
+  myTasks: () => request<{ tasks: MyTask[] }>("/api/me/tasks"),
+
+  // ── Comments ────────────────────────────────────────────────
+  getComments: (taskId: string) =>
+    request<{ comments: Comment[] }>(`/api/tasks/${taskId}/comments`),
+
+  addComment: (taskId: string, body: string) =>
+    request<{ comment: Comment }>(`/api/tasks/${taskId}/comments`, {
+      method: "POST",
+      body: JSON.stringify({ body }),
+    }),
+
+  deleteComment: (commentId: string) =>
+    request<{ ok: true }>(`/api/comments/${commentId}`, { method: "DELETE" }),
 
   moveTask: (taskId: string, columnId: string, index: number) =>
     request<{ board: Board }>(`/api/tasks/${taskId}/move`, {

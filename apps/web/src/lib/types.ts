@@ -22,6 +22,7 @@ export interface Task {
   title: string;
   description: string;
   priority: Priority;
+  labels: string[];
   assigneeId: string | null;
   estimateHours: number | null;
   dueDate: string | null;
@@ -30,6 +31,33 @@ export interface Task {
   createdAt: string;
   updatedAt: string;
   assignee?: { id: string; name: string; avatarColor: string } | null;
+}
+
+export interface Comment {
+  id: string;
+  taskId: string;
+  body: string;
+  createdAt: string;
+  user: { id: string; name: string; avatarColor: string };
+}
+
+export interface SearchResult {
+  id: string;
+  title: string;
+  priority: Priority;
+  labels: string[];
+  column: { id: string; name: string };
+  assignee: { id: string; name: string; avatarColor: string } | null;
+}
+
+export interface MyTask {
+  id: string;
+  title: string;
+  priority: Priority;
+  dueDate: string | null;
+  labels: string[];
+  project: { id: string; name: string };
+  column: { id: string; name: string };
 }
 
 export interface Column {

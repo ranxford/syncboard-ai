@@ -2,11 +2,15 @@
 
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Trash2, X } from "lucide-react";
+import { Send, Trash2, X } from "lucide-react";
 import { getSocket } from "@/lib/socket";
+import { api } from "@/lib/api";
 import { useBoard } from "@/store/board";
+import { useAuth } from "@/store/auth";
 import { useEscape } from "@/lib/useEscape";
-import type { Member, Priority, Task } from "@/lib/types";
+import { relativeTime } from "@/lib/ui";
+import type { Comment, Member, Priority, Task } from "@/lib/types";
+import { Avatar } from "./Avatar";
 
 const PRIORITIES: Priority[] = ["low", "medium", "high", "urgent"];
 
@@ -31,6 +35,7 @@ export function TaskModal({
   onClose: () => void;
 }) {
   const { createTask, updateTask, deleteTask } = useBoard();
+  const currentUser = useAuth((s) => s.user);
   const isEdit = !!task;
 
   const [title, setTitle] = useState(task?.title ?? "");
@@ -39,16 +44,65 @@ export function TaskModal({
   const [assigneeId, setAssigneeId] = useState<string>(task?.assigneeId ?? "");
   const [estimate, setEstimate] = useState<string>(task?.estimateHours?.toString() ?? "");
   const [dueDate, setDueDate] = useState<string>(toDateInput(task?.dueDate ?? null));
+  const [labels, setLabels] = useState<string[]>(task?.labels ?? []);
+  const [labelInput, setLabelInput] = useState("");
   const [busy, setBusy] = useState(false);
+
+  const [comments, setComments] = useState<Comment[]>([]);
+  const [commentBody, setCommentBody] = useState("");
 
   useEscape(onClose);
 
   useEffect(() => {
-    if (task) getSocket().emit("task:focus", task.id);
+    if (!task) return;
+    const socket = getSocket();
+    socket.emit("task:focus", task.id);
+
+    api.getComments(task.id).then(({ comments }) => setComments(comments)).catch(() => {});
+
+    const onAdded = (p: { taskId: string; comment: Comment }) => {
+      if (p.taskId === task.id) setComments((c) => (c.some((x) => x.id === p.comment.id) ? c : [...c, p.comment]));
+    };
+    const onDeleted = (p: { taskId: string; commentId: string }) => {
+      if (p.taskId === task.id) setComments((c) => c.filter((x) => x.id !== p.commentId));
+    };
+    socket.on("comment:added", onAdded);
+    socket.on("comment:deleted", onDeleted);
+
     return () => {
-      getSocket().emit("task:focus", null);
+      socket.emit("task:focus", null);
+      socket.off("comment:added", onAdded);
+      socket.off("comment:deleted", onDeleted);
     };
   }, [task]);
+
+  function addLabel() {
+    const v = labelInput.trim();
+    if (v && !labels.includes(v)) setLabels([...labels, v]);
+    setLabelInput("");
+  }
+
+  async function sendComment(e: React.FormEvent) {
+    e.preventDefault();
+    if (!task || !commentBody.trim()) return;
+    const body = commentBody.trim();
+    setCommentBody("");
+    try {
+      const { comment } = await api.addComment(task.id, body);
+      setComments((c) => (c.some((x) => x.id === comment.id) ? c : [...c, comment]));
+    } catch {
+      setCommentBody(body);
+    }
+  }
+
+  async function removeComment(id: string) {
+    setComments((c) => c.filter((x) => x.id !== id));
+    try {
+      await api.deleteComment(id);
+    } catch {
+      /* will resync on next open */
+    }
+  }
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
@@ -61,6 +115,7 @@ export function TaskModal({
       assigneeId: assigneeId || null,
       estimateHours: estimate ? Number(estimate) : null,
       dueDate: fromDateInput(dueDate),
+      labels,
     };
     try {
       if (isEdit && task) await updateTask(task.id, payload);
@@ -91,7 +146,7 @@ export function TaskModal({
         initial={{ opacity: 0, scale: 0.96, y: 10 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         onClick={(e) => e.stopPropagation()}
-        className="glass card-shadow w-full max-w-lg rounded-2xl p-6"
+        className="glass card-shadow max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl p-6"
       >
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-lg font-semibold text-gray-50">{isEdit ? "Edit task" : "New task"}</h2>
@@ -181,6 +236,41 @@ export function TaskModal({
             </div>
           </div>
 
+          <div>
+            <label className="mb-1 block text-xs font-medium text-gray-400">Labels</label>
+            {labels.length > 0 && (
+              <div className="mb-2 flex flex-wrap gap-1.5">
+                {labels.map((label) => (
+                  <span
+                    key={label}
+                    className="inline-flex items-center gap-1 rounded-full bg-brand-500/15 px-2 py-0.5 text-xs text-brand-300"
+                  >
+                    {label}
+                    <button
+                      type="button"
+                      onClick={() => setLabels(labels.filter((l) => l !== label))}
+                      className="text-brand-300/70 hover:text-white"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+            <input
+              className="input"
+              placeholder="Add a label and press Enter"
+              value={labelInput}
+              onChange={(e) => setLabelInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === ",") {
+                  e.preventDefault();
+                  addLabel();
+                }
+              }}
+            />
+          </div>
+
           <div className="flex items-center justify-between pt-2">
             {isEdit ? (
               <button
@@ -204,6 +294,53 @@ export function TaskModal({
             </div>
           </div>
         </form>
+
+        {isEdit && (
+          <div className="mt-6 border-t border-white/10 pt-4">
+            <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-500">
+              Comments ({comments.length})
+            </h3>
+
+            <div className="mb-3 max-h-48 space-y-3 overflow-y-auto">
+              {comments.length === 0 && (
+                <p className="text-sm text-gray-500">No comments yet. Start the discussion.</p>
+              )}
+              {comments.map((c) => (
+                <div key={c.id} className="group flex items-start gap-2.5">
+                  <Avatar name={c.user.name} color={c.user.avatarColor} size={28} />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-gray-100">{c.user.name}</span>
+                      <span className="text-[10px] text-gray-500">{relativeTime(c.createdAt)}</span>
+                      {c.user.id === currentUser?.id && (
+                        <button
+                          onClick={() => removeComment(c.id)}
+                          className="ml-auto text-gray-600 opacity-0 transition-opacity hover:text-red-300 group-hover:opacity-100"
+                          title="Delete comment"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                    </div>
+                    <p className="whitespace-pre-wrap break-words text-sm text-gray-300">{c.body}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <form onSubmit={sendComment} className="flex items-center gap-2">
+              <input
+                className="input flex-1"
+                placeholder="Write a comment…"
+                value={commentBody}
+                onChange={(e) => setCommentBody(e.target.value)}
+              />
+              <button type="submit" disabled={!commentBody.trim()} className="btn-primary px-3 py-2">
+                <Send className="h-4 w-4" />
+              </button>
+            </form>
+          </div>
+        )}
       </motion.div>
     </div>
   );

@@ -74,6 +74,19 @@ export function TaskCard({
         <span>{task.title}</span>
       </p>
 
+      {task.labels.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-1">
+          {task.labels.map((label) => (
+            <span
+              key={label}
+              className="rounded-full bg-brand-500/15 px-2 py-0.5 text-[10px] font-medium text-brand-300"
+            >
+              {label}
+            </span>
+          ))}
+        </div>
+      )}
+
       {(due || task.estimateHours) && (
         <div className="mt-2.5 flex flex-wrap items-center gap-2 text-[11px]">
           {due && (

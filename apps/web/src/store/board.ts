@@ -37,6 +37,7 @@ interface NewTaskInput {
   assigneeId?: string | null;
   estimateHours?: number | null;
   dueDate?: string | null;
+  labels?: string[];
 }
 type UpdateTaskInput = Partial<{
   title: string;
@@ -45,6 +46,7 @@ type UpdateTaskInput = Partial<{
   assigneeId: string | null;
   estimateHours: number | null;
   dueDate: string | null;
+  labels: string[];
 }>;
 
 // ── pure helpers on board state ───────────────────────────────
@@ -112,6 +114,7 @@ export const useBoard = create<BoardState>((set, get) => ({
       title: data.title,
       description: data.description ?? "",
       priority: data.priority ?? "medium",
+      labels: data.labels ?? [],
       assigneeId: data.assigneeId ?? null,
       estimateHours: data.estimateHours ?? null,
       dueDate: data.dueDate ?? null,

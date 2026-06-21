@@ -7,6 +7,7 @@ import { projectsRouter } from "./routes/projects.js";
 import { tasksRouter } from "./routes/tasks.js";
 import { analyticsRouter } from "./routes/analytics.js";
 import { aiRouter } from "./routes/ai.js";
+import { commentsRouter } from "./routes/comments.js";
 import { initSocket } from "./realtime/socket.js";
 
 const app = express();
@@ -23,6 +24,7 @@ app.use("/api/projects", projectsRouter);
 app.use("/api", tasksRouter);
 app.use("/api", analyticsRouter);
 app.use("/api", aiRouter);
+app.use("/api", commentsRouter);
 
 // Centralized error fallback
 app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {

@@ -39,8 +39,20 @@ export async function getBoardState(projectId: string) {
       avatarColor: m.user.avatarColor,
       role: m.role,
     })),
-    columns,
+    columns: columns.map((c) => ({
+      ...c,
+      tasks: c.tasks.map((t) => ({ ...t, labels: parseLabels(t.labels) })),
+    })),
   };
+}
+
+export function parseLabels(raw: string): string[] {
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.filter((x) => typeof x === "string") : [];
+  } catch {
+    return [];
+  }
 }
 
 export async function recordActivity(params: {

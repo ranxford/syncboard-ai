@@ -3,14 +3,16 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { FolderKanban, Plus, Trash2, Users } from "lucide-react";
+import { CalendarClock, FolderKanban, Plus, Trash2, Users } from "lucide-react";
 import { api } from "@/lib/api";
-import type { ProjectSummary } from "@/lib/types";
+import type { MyTask, ProjectSummary } from "@/lib/types";
+import { PRIORITY_STYLES, dueLabel } from "@/lib/ui";
 import { AuthGate } from "@/components/AuthGate";
 import { Navbar } from "@/components/Navbar";
 
 function DashboardInner() {
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
+  const [myTasks, setMyTasks] = useState<MyTask[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState("");
@@ -19,8 +21,9 @@ function DashboardInner() {
 
   async function load() {
     try {
-      const { projects } = await api.listProjects();
+      const [{ projects }, { tasks }] = await Promise.all([api.listProjects(), api.myTasks()]);
       setProjects(projects);
+      setMyTasks(tasks);
     } finally {
       setLoading(false);
     }
@@ -94,6 +97,50 @@ function DashboardInner() {
               </button>
             </div>
           </motion.form>
+        )}
+
+        {!loading && myTasks.length > 0 && (
+          <section className="glass mb-7 rounded-2xl p-5">
+            <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-gray-200">
+              <CalendarClock className="h-4 w-4 text-brand-400" /> Assigned to me
+              <span className="rounded-full bg-white/5 px-2 py-0.5 text-xs text-gray-400">
+                {myTasks.length}
+              </span>
+            </h2>
+            <div className="space-y-1.5">
+              {myTasks.slice(0, 6).map((t) => {
+                const prio = PRIORITY_STYLES[t.priority];
+                const due = dueLabel(t.dueDate);
+                return (
+                  <Link
+                    key={t.id}
+                    href={`/board/${t.project.id}`}
+                    className="flex items-center gap-3 rounded-lg px-2 py-2 hover:bg-white/5"
+                  >
+                    <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: prio.dot }} />
+                    <span className="min-w-0 flex-1 truncate text-sm text-gray-200">{t.title}</span>
+                    <span className="hidden shrink-0 text-xs text-gray-500 sm:inline">{t.project.name}</span>
+                    <span className="shrink-0 rounded bg-white/5 px-1.5 py-0.5 text-[10px] text-gray-400">
+                      {t.column.name}
+                    </span>
+                    {due && (
+                      <span
+                        className={`shrink-0 text-[11px] ${
+                          due.tone === "over"
+                            ? "text-red-300"
+                            : due.tone === "soon"
+                              ? "text-amber-300"
+                              : "text-gray-500"
+                        }`}
+                      >
+                        {due.text}
+                      </span>
+                    )}
+                  </Link>
+                );
+              })}
+            </div>
+          </section>
         )}
 
         {loading ? (

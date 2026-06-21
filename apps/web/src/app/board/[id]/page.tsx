@@ -9,6 +9,7 @@ import type { Board, PresenceUser, Task } from "@/lib/types";
 import { AuthGate } from "@/components/AuthGate";
 import { Navbar } from "@/components/Navbar";
 import { KanbanBoard } from "@/components/KanbanBoard";
+import { BoardSearch } from "@/components/BoardSearch";
 import { PresenceBar } from "@/components/PresenceBar";
 import { ConnectivityBadge } from "@/components/ConnectivityBadge";
 import { TaskModal } from "@/components/TaskModal";
@@ -105,6 +106,15 @@ function BoardInner({ projectId }: { projectId: string }) {
           <ConnectivityBadge />
         </div>
         <div className="ml-auto flex items-center gap-3">
+          {board && (
+            <BoardSearch
+              projectId={projectId}
+              onSelect={(taskId) => {
+                const found = board.columns.flatMap((c) => c.tasks).find((t) => t.id === taskId);
+                if (found) setEditing(found);
+              }}
+            />
+          )}
           {board && <PresenceBar projectId={projectId} />}
           <button onClick={() => setFeedOpen((v) => !v)} className="btn-ghost px-2.5 py-1.5" title="Activity">
             <History className="h-4 w-4" />

@@ -58,21 +58,21 @@ async function main() {
   const col = (name: string) => project.columns.find((c) => c.name === name)!;
 
   const tasks = [
-    { title: "Design onboarding flow", column: "Backlog", assignee: grace.id, priority: "medium", est: 6 },
-    { title: "Research offline sync strategy", column: "Backlog", assignee: null, priority: "low", est: 3 },
-    { title: "Set up CI/CD pipeline", column: "To Do", assignee: ada.id, priority: "high", est: 5 },
-    { title: "Build kanban drag-and-drop", column: "To Do", assignee: ada.id, priority: "high", est: 8 },
+    { title: "Design onboarding flow", column: "Backlog", assignee: grace.id, priority: "medium", est: 6, labels: ["design", "ux"] },
+    { title: "Research offline sync strategy", column: "Backlog", assignee: null, priority: "low", est: 3, labels: ["research"] },
+    { title: "Set up CI/CD pipeline", column: "To Do", assignee: ada.id, priority: "high", est: 5, labels: ["devops"] },
+    { title: "Build kanban drag-and-drop", column: "To Do", assignee: ada.id, priority: "high", est: 8, labels: ["frontend", "ui"] },
     // Stagnant task: entered In Progress 6 days ago
-    { title: "Implement WebSocket presence", column: "In Progress", assignee: ada.id, priority: "high", est: 8, entered: daysAgo(6) },
-    { title: "Wire up AI analytics panel", column: "In Progress", assignee: ada.id, priority: "urgent", est: 10 },
+    { title: "Implement WebSocket presence", column: "In Progress", assignee: ada.id, priority: "high", est: 8, entered: daysAgo(6), labels: ["realtime", "backend"] },
+    { title: "Wire up AI analytics panel", column: "In Progress", assignee: ada.id, priority: "urgent", est: 10, labels: ["ai", "frontend"] },
     // Overdue task
-    { title: "Write API documentation", column: "In Progress", assignee: ada.id, priority: "medium", est: 4, due: daysAgo(2) },
+    { title: "Write API documentation", column: "In Progress", assignee: ada.id, priority: "medium", est: 4, due: daysAgo(2), labels: ["docs"] },
     // Deadline approaching
-    { title: "Security review", column: "Review", assignee: grace.id, priority: "high", est: 5, due: daysFromNow(1) },
-    { title: "Accessibility audit", column: "Review", assignee: linus.id, priority: "medium", est: 4 },
+    { title: "Security review", column: "Review", assignee: grace.id, priority: "high", est: 5, due: daysFromNow(1), labels: ["security"] },
+    { title: "Accessibility audit", column: "Review", assignee: linus.id, priority: "medium", est: 4, labels: ["a11y"] },
     // Completed tasks
-    { title: "Project scaffolding", column: "Done", assignee: linus.id, priority: "medium", est: 3, completed: daysAgo(3), created: daysAgo(5) },
-    { title: "Auth + JWT", column: "Done", assignee: grace.id, priority: "high", est: 6, completed: daysAgo(1), created: daysAgo(4) },
+    { title: "Project scaffolding", column: "Done", assignee: linus.id, priority: "medium", est: 3, completed: daysAgo(3), created: daysAgo(5), labels: [] },
+    { title: "Auth + JWT", column: "Done", assignee: grace.id, priority: "high", est: 6, completed: daysAgo(1), created: daysAgo(4), labels: ["backend"] },
   ];
 
   let orderByCol: Record<string, number> = {};
@@ -92,7 +92,21 @@ async function main() {
         enteredColumnAt: (t as any).entered ?? new Date(),
         completedAt: (t as any).completed ?? null,
         createdAt: (t as any).created ?? new Date(),
+        labels: JSON.stringify((t as any).labels ?? []),
       },
+    });
+  }
+
+  // Seed a short comment thread on one task to showcase discussions.
+  const wsTask = await prisma.task.findFirst({
+    where: { projectId: project.id, title: "Implement WebSocket presence" },
+  });
+  if (wsTask) {
+    await prisma.comment.create({
+      data: { taskId: wsTask.id, userId: grace.id, body: "Should we use one Socket.io room per project?" },
+    });
+    await prisma.comment.create({
+      data: { taskId: wsTask.id, userId: ada.id, body: "Yes — joining `project:<id>` on board open. Pushing an update today." },
     });
   }
 
