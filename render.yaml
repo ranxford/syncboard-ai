@@ -1,0 +1,39 @@
+# Render blueprint for the SyncBoard AI+ API.
+# Deploy: push to GitHub, then in Render → "New +" → "Blueprint" and select this repo.
+#
+# The web app (apps/web) is best deployed on Vercel (see README "Deployment").
+# Point its NEXT_PUBLIC_API_URL / NEXT_PUBLIC_SOCKET_URL at this service's URL.
+
+services:
+  - type: web
+    name: syncboard-api
+    runtime: docker
+    dockerfilePath: ./apps/server/Dockerfile
+    dockerContext: .
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: JWT_SECRET
+        generateValue: true
+      - key: WEB_ORIGIN
+        sync: false # set to your Vercel web URL, e.g. https://syncboard.vercel.app
+      - key: AI_PROVIDER
+        value: heuristic
+      # For OpenAI: set AI_PROVIDER=openai and add OPENAI_API_KEY in the dashboard.
+      # ── SQLite (default): persist the DB on a disk ──
+      - key: DATABASE_URL
+        value: file:./dev.db
+    disk:
+      name: syncboard-data
+      mountPath: /app/apps/server/prisma
+      sizeGB: 1
+
+  # ── Optional: switch to managed Postgres + Redis for scale ──
+  # 1. Uncomment the databases block below.
+  # 2. Set DATABASE_URL above to fromDatabase, and change schema.prisma provider
+  #    to "postgresql".
+  # 3. Add a REDIS_URL env var pointing at the Redis instance.
+#
+# databases:
+#   - name: syncboard-postgres
+#     plan: free

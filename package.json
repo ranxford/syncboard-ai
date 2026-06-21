@@ -17,6 +17,7 @@
     "db:setup": "npm run db:setup --workspace apps/server",
     "db:seed": "npm run db:seed --workspace apps/server",
     "db:studio": "npm run db:studio --workspace apps/server",
+    "test": "npm run test --workspace apps/server",
     "setup": "npm install && npm run db:setup && npm run db:seed"
   },
   "devDependencies": {

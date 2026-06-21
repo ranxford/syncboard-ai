@@ -34,6 +34,48 @@ teams coordinated, even in low-connectivity environments.
 
 ---
 
+## 🏗️ Architecture
+
+```mermaid
+flowchart LR
+  subgraph Browser["Browser — Next.js (apps/web)"]
+    UI["Kanban board · AI panel · Meeting modal"]
+    Store["Zustand store<br/>(optimistic updates)"]
+    OQ["Offline queue<br/>(localStorage)"]
+    WSC["Socket.io client"]
+    UI --> Store --> OQ
+    UI --> WSC
+  end
+
+  subgraph Server["API — Express + Socket.io (apps/server)"]
+    REST["REST routes<br/>auth · projects · tasks · analytics · ai"]
+    JWT["JWT auth"]
+    RT["Realtime: rooms · presence · broadcast"]
+    AIE["AI engine<br/>heuristic / OpenAI"]
+    REST --> JWT
+    REST --> AIE
+    RT --> AIE
+  end
+
+  DB[("Prisma → SQLite / PostgreSQL")]
+  REDIS[("Redis (optional)")]
+  OAI["OpenAI API (optional)"]
+
+  Store -- "REST (fetch)" --> REST
+  OQ -- "replay on reconnect" --> REST
+  WSC <-- "WebSocket: board:updated · presence" --> RT
+  REST --> DB
+  RT --> DB
+  RT -.-> REDIS
+  AIE -.-> OAI
+```
+
+**Data flow:** a user action updates local state optimistically and hits the REST
+API; the server persists via Prisma and broadcasts the authoritative board over
+Socket.io to everyone in the project room. If the network is down, the change is
+queued locally and replayed on reconnect. The AI engine reads board state to
+produce predictions, workload analysis, and meeting summaries.
+
 ## 📦 Project structure
 
 ```
@@ -151,6 +193,37 @@ Then re-run `npm run db:setup && npm run db:seed`.
 
 ---
 
+## ☁️ Deployment
+
+The app splits cleanly into a static-ish frontend and a stateful realtime API.
+
+### Frontend → Vercel (recommended)
+1. Push this repo to GitHub and import it in Vercel.
+2. Set **Root Directory** to `apps/web` (Vercel auto-detects Next.js).
+3. Add environment variables:
+   - `NEXT_PUBLIC_API_URL` → your API URL (e.g. `https://syncboard-api.onrender.com`)
+   - `NEXT_PUBLIC_SOCKET_URL` → same API URL
+4. Deploy.
+
+### API → Render (blueprint included) or Railway
+- **Render**: push to GitHub, then *New + → Blueprint* and pick this repo. The
+  included [`render.yaml`](./render.yaml) provisions the API from
+  [`apps/server/Dockerfile`](./apps/server/Dockerfile) with a persistent disk for
+  SQLite and an auto-generated `JWT_SECRET`. Set `WEB_ORIGIN` to your Vercel URL.
+- **Any Docker host**: build from the repo root:
+  ```bash
+  docker build -f apps/server/Dockerfile -t syncboard-api .
+  docker run -p 4000:4000 -e JWT_SECRET=... -e WEB_ORIGIN=https://your-web-url syncboard-api
+  ```
+
+### Scaling to PostgreSQL + Redis
+For production scale, switch the Prisma datasource `provider` to `postgresql`,
+point `DATABASE_URL` at managed Postgres, and set `REDIS_URL`. See the commented
+sections in `render.yaml` and `docker-compose.yml`.
+
+> **CORS note:** set the API's `WEB_ORIGIN` to your deployed web origin so the
+> browser and WebSocket connections are accepted.
+
 ## 🧪 How the offline resilience works
 
 1. Every board mutation is applied **optimistically** to local state.
@@ -174,6 +247,10 @@ Then re-run `npm run db:setup && npm run db:seed`.
 | `npm run build` | Build both apps |
 | `npm run db:seed` | Re-seed demo data |
 | `npm run db:studio` | Open Prisma Studio |
+| `npm test` | Run the AI-engine test suite |
+
+CI runs install → Prisma generate → build → tests on every push/PR (see
+[`.github/workflows/ci.yml`](./.github/workflows/ci.yml)).
 
 ---
 
