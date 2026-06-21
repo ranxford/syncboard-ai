@@ -1,0 +1,28 @@
+{
+  "name": "syncboard-ai",
+  "version": "0.1.0",
+  "private": true,
+  "description": "SyncBoard AI+ — an intelligent real-time collaborative web platform for distributed teams.",
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "concurrently -n server,web -c blue,magenta \"npm:dev:server\" \"npm:dev:web\"",
+    "dev:server": "npm run dev --workspace apps/server",
+    "dev:web": "npm run dev --workspace apps/web",
+    "build": "npm run build --workspace apps/server && npm run build --workspace apps/web",
+    "start": "concurrently -n server,web -c blue,magenta \"npm:start:server\" \"npm:start:web\"",
+    "start:server": "npm run start --workspace apps/server",
+    "start:web": "npm run start --workspace apps/web",
+    "db:setup": "npm run db:setup --workspace apps/server",
+    "db:seed": "npm run db:seed --workspace apps/server",
+    "db:studio": "npm run db:studio --workspace apps/server",
+    "setup": "npm install && npm run db:setup && npm run db:seed"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  },
+  "engines": {
+    "node": ">=18.18"
+  }
+}

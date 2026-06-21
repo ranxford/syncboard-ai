@@ -1,0 +1,40 @@
+# Optional production-like infrastructure for SyncBoard AI+.
+# Local dev works WITHOUT this (SQLite + in-memory pub/sub).
+# Use this when you want to run against PostgreSQL + Redis:
+#   docker compose up -d
+# Then set in your .env:
+#   DATABASE_URL="postgresql://postgres:postgres@localhost:5432/syncboard?schema=public"
+#   REDIS_URL="redis://localhost:6379"
+# and change the prisma datasource provider to "postgresql".
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: syncboard-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: syncboard
+    ports:
+      - "5432:5432"
+    volumes:
+      - syncboard_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: syncboard-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - syncboard_redisdata:/data
+
+volumes:
+  syncboard_pgdata:
+  syncboard_redisdata:
