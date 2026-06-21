@@ -110,6 +110,17 @@ projectsRouter.get("/:id/activity", async (req: AuthedRequest, res) => {
   });
 });
 
+projectsRouter.delete("/:id", async (req: AuthedRequest, res) => {
+  const project = await prisma.project.findUnique({ where: { id: req.params.id } });
+  if (!project) return res.status(404).json({ error: "Project not found" });
+  if (project.ownerId !== req.userId!) {
+    return res.status(403).json({ error: "Only the project owner can delete it" });
+  }
+  // related columns/tasks/memberships/activities cascade via schema onDelete rules
+  await prisma.project.delete({ where: { id: project.id } });
+  res.json({ ok: true });
+});
+
 const addMemberSchema = z.object({ email: z.string().email() });
 
 projectsRouter.post("/:id/members", async (req: AuthedRequest, res) => {

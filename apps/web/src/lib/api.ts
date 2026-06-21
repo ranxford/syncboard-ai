@@ -96,6 +96,9 @@ export const api = {
 
   getBoard: (projectId: string) => request<{ board: Board }>(`/api/projects/${projectId}`),
 
+  deleteProject: (projectId: string) =>
+    request<{ ok: true }>(`/api/projects/${projectId}`, { method: "DELETE" }),
+
   getActivity: (projectId: string) =>
     request<{ activities: import("./types").Activity[] }>(`/api/projects/${projectId}/activity`),
 

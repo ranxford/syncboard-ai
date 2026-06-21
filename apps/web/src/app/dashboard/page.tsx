@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { FolderKanban, Plus, Users } from "lucide-react";
+import { FolderKanban, Plus, Trash2, Users } from "lucide-react";
 import { api } from "@/lib/api";
 import type { ProjectSummary } from "@/lib/types";
 import { AuthGate } from "@/components/AuthGate";
@@ -29,6 +29,12 @@ function DashboardInner() {
   useEffect(() => {
     load();
   }, []);
+
+  async function removeProject(id: string, name: string) {
+    if (!window.confirm(`Delete "${name}" and all its tasks? This cannot be undone.`)) return;
+    await api.deleteProject(id);
+    await load();
+  }
 
   async function createProject(e: React.FormEvent) {
     e.preventDefault();
@@ -110,7 +116,17 @@ function DashboardInner() {
                 initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.04 }}
+                className="group relative"
               >
+                {p.role === "owner" && (
+                  <button
+                    onClick={() => removeProject(p.id, p.name)}
+                    className="absolute bottom-3 right-3 z-10 rounded-md p-1.5 text-gray-500 opacity-0 transition-opacity hover:bg-red-500/15 hover:text-red-300 group-hover:opacity-100"
+                    title="Delete project"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                )}
                 <Link
                   href={`/board/${p.id}`}
                   className="glass card-shadow block h-full rounded-2xl p-5 transition-colors hover:border-brand-500/40"
