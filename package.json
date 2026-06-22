@@ -11,6 +11,7 @@
     "dev:server": "npm run dev --workspace apps/server",
     "dev:web": "npm run dev --workspace apps/web",
     "build": "npm run build --workspace apps/server && npm run build --workspace apps/web",
+    "lint": "npm run lint --workspace apps/web",
     "start": "concurrently -n server,web -c blue,magenta \"npm:start:server\" \"npm:start:web\"",
     "start:server": "npm run start --workspace apps/server",
     "start:web": "npm run start --workspace apps/web",

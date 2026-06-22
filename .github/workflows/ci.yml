@@ -27,6 +27,9 @@ jobs:
       - name: Generate Prisma client + sync schema
         run: npm run db:setup
 
+      - name: Lint (web)
+        run: npm run lint
+
       - name: Build (server + web)
         run: npm run build
 
