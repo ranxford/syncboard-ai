@@ -8,6 +8,8 @@ import { TaskCard } from "./TaskCard";
 export function BoardColumn({
   column,
   done = false,
+  visibleTasks,
+  filtering = false,
   watchersByTask,
   draggingId,
   onCardClick,
@@ -19,6 +21,8 @@ export function BoardColumn({
 }: {
   column: Column;
   done?: boolean;
+  visibleTasks?: Task[];
+  filtering?: boolean;
   watchersByTask: Record<string, PresenceUser[]>;
   draggingId: string | null;
   onCardClick: (task: Task) => void;
@@ -30,6 +34,7 @@ export function BoardColumn({
 }) {
   const [over, setOver] = useState(false);
   const overLimit = column.wipLimit != null && column.tasks.length > column.wipLimit;
+  const tasks = visibleTasks ?? column.tasks;
 
   return (
     <div className="flex w-72 shrink-0 flex-col">
@@ -37,8 +42,9 @@ export function BoardColumn({
         <div className="flex items-center gap-2">
           <h3 className="text-sm font-semibold text-gray-200">{column.name}</h3>
           <span className="rounded-full bg-white/5 px-2 py-0.5 text-xs text-gray-400">
-            {column.tasks.length}
-            {column.wipLimit != null ? `/${column.wipLimit}` : ""}
+            {filtering
+              ? `${tasks.length}/${column.tasks.length}`
+              : `${column.tasks.length}${column.wipLimit != null ? `/${column.wipLimit}` : ""}`}
           </span>
           {overLimit && (
             <span title="Over WIP limit">
@@ -70,7 +76,7 @@ export function BoardColumn({
           over ? "border-brand-500/60 bg-brand-500/5" : "border-transparent"
         }`}
       >
-        {column.tasks.map((task) => (
+        {tasks.map((task) => (
           <div
             key={task.id}
             onDragOver={(e) => e.preventDefault()}
@@ -93,14 +99,17 @@ export function BoardColumn({
           </div>
         ))}
 
-        {column.tasks.length === 0 && (
-          <button
-            onClick={() => onAddTask(column.id)}
-            className="rounded-lg border border-dashed border-white/10 py-6 text-xs text-gray-500 hover:border-white/20 hover:text-gray-300"
-          >
-            + Add a task
-          </button>
-        )}
+        {tasks.length === 0 &&
+          (filtering ? (
+            <p className="py-6 text-center text-xs text-gray-600">No matching tasks</p>
+          ) : (
+            <button
+              onClick={() => onAddTask(column.id)}
+              className="rounded-lg border border-dashed border-white/10 py-6 text-xs text-gray-500 hover:border-white/20 hover:text-gray-300"
+            >
+              + Add a task
+            </button>
+          ))}
       </div>
     </div>
   );

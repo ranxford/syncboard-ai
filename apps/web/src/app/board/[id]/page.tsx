@@ -127,7 +127,7 @@ function BoardInner({ projectId }: { projectId: string }) {
 
       {/* Body */}
       <div className="flex flex-1 overflow-hidden">
-        <div className="flex-1 overflow-hidden pt-4">
+        <div className="flex-1 overflow-hidden">
           {loading ? (
             <div className="flex h-full items-center justify-center">
               <div className="h-8 w-8 animate-spin rounded-full border-2 border-brand-500 border-t-transparent" />

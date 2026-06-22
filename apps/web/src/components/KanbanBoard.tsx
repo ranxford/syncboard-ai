@@ -3,8 +3,10 @@
 import { useMemo, useState } from "react";
 import { getSocket } from "@/lib/socket";
 import { useBoard } from "@/store/board";
+import { useAuth } from "@/store/auth";
 import type { PresenceUser, Task } from "@/lib/types";
 import { BoardColumn } from "./BoardColumn";
+import { BoardFilters, EMPTY_FILTERS, isFilterActive, type BoardFilterState } from "./BoardFilters";
 
 export function KanbanBoard({
   onEditTask,
@@ -16,7 +18,40 @@ export function KanbanBoard({
   const board = useBoard((s) => s.board);
   const presence = useBoard((s) => s.presence);
   const moveTask = useBoard((s) => s.moveTask);
+  const currentUserId = useAuth((s) => s.user?.id);
   const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [filters, setFilters] = useState<BoardFilterState>(EMPTY_FILTERS);
+
+  const allLabels = useMemo(() => {
+    if (!board) return [] as string[];
+    const set = new Set<string>();
+    for (const c of board.columns) for (const t of c.tasks) for (const l of t.labels) set.add(l);
+    return [...set].sort((a, b) => a.localeCompare(b));
+  }, [board]);
+
+  const matchesFilters = useMemo(() => {
+    return (task: Task) => {
+      if (filters.labels.length > 0 && !filters.labels.some((l) => task.labels.includes(l))) {
+        return false;
+      }
+      if (filters.assigneeId === "unassigned") return task.assigneeId == null;
+      if (filters.assigneeId != null) return task.assigneeId === filters.assigneeId;
+      return true;
+    };
+  }, [filters]);
+
+  const { totalCount, shownCount } = useMemo(() => {
+    if (!board) return { totalCount: 0, shownCount: 0 };
+    let total = 0;
+    let shown = 0;
+    for (const c of board.columns) {
+      for (const t of c.tasks) {
+        total += 1;
+        if (matchesFilters(t)) shown += 1;
+      }
+    }
+    return { totalCount: total, shownCount: shown };
+  }, [board, matchesFilters]);
 
   const watchersByTask = useMemo(() => {
     const map: Record<string, PresenceUser[]> = {};
@@ -76,23 +111,38 @@ export function KanbanBoard({
     getSocket().emit("task:focus", null);
   }
 
+  const filtering = isFilterActive(filters);
+
   return (
-    <div className="flex h-full gap-4 overflow-x-auto px-4 pb-4 md:px-6">
-      {board.columns.map((column) => (
-        <BoardColumn
-          key={column.id}
-          column={column}
-          done={doneColumnIds.has(column.id)}
-          watchersByTask={watchersByTask}
-          draggingId={draggingId}
-          onCardClick={onEditTask}
-          onAddTask={onAddTask}
-          onDragStart={handleDragStart}
-          onDragEnd={handleDragEnd}
-          onDropBeforeTask={handleDropBeforeTask}
-          onDropToEnd={handleDropToEnd}
-        />
-      ))}
+    <div className="flex h-full flex-col overflow-hidden">
+      <BoardFilters
+        allLabels={allLabels}
+        members={board.members}
+        currentUserId={currentUserId}
+        filters={filters}
+        onChange={setFilters}
+        shown={shownCount}
+        total={totalCount}
+      />
+      <div className="flex flex-1 gap-4 overflow-x-auto px-4 pb-4 pt-4 md:px-6">
+        {board.columns.map((column) => (
+          <BoardColumn
+            key={column.id}
+            column={column}
+            done={doneColumnIds.has(column.id)}
+            visibleTasks={filtering ? column.tasks.filter(matchesFilters) : column.tasks}
+            filtering={filtering}
+            watchersByTask={watchersByTask}
+            draggingId={draggingId}
+            onCardClick={onEditTask}
+            onAddTask={onAddTask}
+            onDragStart={handleDragStart}
+            onDragEnd={handleDragEnd}
+            onDropBeforeTask={handleDropBeforeTask}
+            onDropToEnd={handleDropToEnd}
+          />
+        ))}
+      </div>
     </div>
   );
 }
