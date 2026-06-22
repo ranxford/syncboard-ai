@@ -1,4 +1,7 @@
 import { prisma } from "../prisma.js";
+import { parseLabels } from "./labels.js";
+
+export { parseLabels } from "./labels.js";
 
 /** Full board state for a project: members, columns (ordered) and their tasks (ordered). */
 export async function getBoardState(projectId: string) {
@@ -44,15 +47,6 @@ export async function getBoardState(projectId: string) {
       tasks: c.tasks.map((t) => ({ ...t, labels: parseLabels(t.labels) })),
     })),
   };
-}
-
-export function parseLabels(raw: string): string[] {
-  try {
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed.filter((x) => typeof x === "string") : [];
-  } catch {
-    return [];
-  }
 }
 
 export async function recordActivity(params: {

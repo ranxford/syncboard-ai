@@ -11,7 +11,9 @@
     "db:setup": "prisma generate && prisma db push",
     "db:seed": "tsx prisma/seed.ts",
     "db:studio": "prisma studio",
-    "test": "node --import tsx --test src/ai/heuristic.test.ts"
+    "test": "node --import tsx --test src/*/*.test.ts",
+    "test:unit": "node --import tsx --test src/ai/heuristic.test.ts src/lib/labels.test.ts",
+    "test:integration": "node --import tsx --test src/routes/api.integration.test.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.2.1",
