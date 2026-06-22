@@ -245,12 +245,27 @@ sections in `render.yaml` and `docker-compose.yml`.
 | `npm run dev` | Run web + server together |
 | `npm run dev:server` / `npm run dev:web` | Run individually |
 | `npm run build` | Build both apps |
+| `npm run lint` | Lint the web app (ESLint / next core-web-vitals) |
 | `npm run db:seed` | Re-seed demo data |
 | `npm run db:studio` | Open Prisma Studio |
-| `npm test` | Run the AI-engine test suite |
+| `npm test` | Run the full server test suite (AI engine + label units + HTTP integration) |
 
-CI runs install → Prisma generate → build → tests on every push/PR (see
-[`.github/workflows/ci.yml`](./.github/workflows/ci.yml)).
+CI runs install → Prisma generate → lint → build → tests on every push/PR (see
+[`.github/workflows/ci.yml`](./.github/workflows/ci.yml)). The test suite includes
+an HTTP integration layer that spins up the real Express app against a throwaway
+SQLite database and exercises auth, projects, tasks/labels, search, comments,
+task moves, and cascading project deletion.
+
+## 🔒 Production hardening
+
+- **Security headers** via [Helmet](https://helmetjs.github.io/) (HSTS, `X-Content-Type-Options`,
+  `X-Frame-Options`, cross-origin resource policy tuned for the cross-origin web client).
+- **Rate limiting** on `/api/auth/login` and `/api/auth/register` to blunt credential
+  stuffing / brute force (disabled automatically under `NODE_ENV=test`).
+- **Readiness check**: `GET /health` runs a `SELECT 1` and returns `503` if the
+  database is unreachable — wire it to your platform's health probe.
+- **Graceful shutdown**: `SIGTERM`/`SIGINT` close the HTTP server and disconnect
+  Prisma before exit, so rolling deploys drain cleanly.
 
 ---
 

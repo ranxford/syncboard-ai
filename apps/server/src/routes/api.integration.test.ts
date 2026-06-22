@@ -13,6 +13,7 @@ const dbFile = join(tmpDir, "test.db");
 process.env.DATABASE_URL = `file:${dbFile}`;
 process.env.JWT_SECRET = "test-secret";
 process.env.AI_PROVIDER = "heuristic";
+process.env.NODE_ENV = "test";
 
 let server: Server;
 let baseUrl: string;
@@ -69,6 +70,7 @@ const ctx: {
   otherToken?: string;
   projectId?: string;
   todoColumnId?: string;
+  doneColumnId?: string;
   taskId?: string;
 } = {};
 
@@ -103,6 +105,9 @@ test("create a project and read its default columns", async () => {
   const todo = board.columns.find((c: any) => c.name === "To Do");
   assert.ok(todo, "expected a To Do column");
   ctx.todoColumnId = todo.id;
+  const done = board.columns.find((c: any) => c.name === "Done");
+  assert.ok(done, "expected a Done column");
+  ctx.doneColumnId = done.id;
 });
 
 test("create a task with labels and read them back as an array", async () => {
@@ -232,4 +237,54 @@ test("only the author can delete their comment", async () => {
 test("requests without a token are rejected", async () => {
   const res = await api("/api/me/tasks");
   assert.equal(res.status, 401);
+});
+
+test("health check reports db connectivity", async () => {
+  const res = await api("/health");
+  assert.equal(res.status, 200);
+  assert.equal(res.body.status, "ok");
+  assert.equal(res.body.db, "ok");
+});
+
+test("moving a task to Done marks it completed and drops it from assigned-to-me", async () => {
+  const moved = await api(`/api/tasks/${ctx.taskId}/move`, {
+    method: "POST",
+    token: ctx.token,
+    body: { columnId: ctx.doneColumnId, index: 0 },
+  });
+  assert.equal(moved.status, 200);
+
+  const taskOnBoard = moved.body.board.columns
+    .flatMap((c: any) => c.tasks)
+    .find((t: any) => t.id === ctx.taskId);
+  assert.equal(taskOnBoard.columnId, ctx.doneColumnId);
+  assert.ok(taskOnBoard.completedAt, "completedAt should be set in a Done column");
+
+  // Completed tasks should no longer appear in the assigned-to-me feed.
+  const mine = await api("/api/me/tasks", { token: ctx.token });
+  assert.ok(!mine.body.tasks.some((t: any) => t.id === ctx.taskId));
+});
+
+test("a non-owner cannot delete the project", async () => {
+  const forbidden = await api(`/api/projects/${ctx.projectId}`, {
+    method: "DELETE",
+    token: ctx.otherToken,
+  });
+  // Bob isn't a member at all here, so access is denied (403).
+  assert.equal(forbidden.status, 403);
+});
+
+test("owner can delete the project and it cascades", async () => {
+  const del = await api(`/api/projects/${ctx.projectId}`, {
+    method: "DELETE",
+    token: ctx.token,
+  });
+  assert.equal(del.status, 200);
+
+  // The project (and its tasks/columns) are gone.
+  const after = await api(`/api/projects/${ctx.projectId}`, { token: ctx.token });
+  assert.equal(after.status, 403);
+
+  const list = await api("/api/projects", { token: ctx.token });
+  assert.ok(!list.body.projects.some((p: any) => p.id === ctx.projectId));
 });
