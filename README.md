@@ -9,6 +9,25 @@ teams coordinated, even in low-connectivity environments.
 
 ---
 
+## 📸 Screenshots
+
+### Landing
+A modern marketing page with a live board preview, feature highlights, and clear calls to action.
+
+![SyncBoard AI+ landing page](./docs/screenshots/landing.png)
+
+### Real-time Kanban board
+Drag-and-drop columns with priorities, labels, estimates, assignees, live presence, and WIP awareness.
+
+![SyncBoard AI+ Kanban board](./docs/screenshots/board.png)
+
+### AI Insights
+Workload balancing, rebalancing suggestions, and predictive risk detection — derived live from board state.
+
+![SyncBoard AI+ AI Insights panel](./docs/screenshots/ai-insights.png)
+
+---
+
 ## ✨ Features
 
 | Feature | Description |
