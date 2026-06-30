@@ -150,10 +150,15 @@ function DashboardInner() {
             ))}
           </div>
         ) : projects.length === 0 ? (
-          <div className="glass flex flex-col items-center rounded-2xl py-16 text-center">
-            <FolderKanban className="mb-3 h-10 w-10 text-gray-500" />
-            <p className="text-gray-300">No projects yet.</p>
-            <p className="text-sm text-gray-500">Create your first board to get started.</p>
+          <div className="card flex flex-col items-center rounded-2xl py-16 text-center">
+            <span className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-500/15 text-brand-400 ring-1 ring-inset ring-brand-500/20">
+              <FolderKanban className="h-7 w-7" />
+            </span>
+            <p className="font-medium text-gray-200">No projects yet</p>
+            <p className="mb-5 text-sm text-gray-500">Create your first board to get your team in sync.</p>
+            <button onClick={() => setCreating(true)} className="btn-primary">
+              <Plus className="h-4 w-4" /> New project
+            </button>
           </div>
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

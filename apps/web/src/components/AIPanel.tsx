@@ -128,9 +128,9 @@ export function AIPanel({
                               {w.openTasks} tasks · {w.estimateHours}h
                             </span>
                           </div>
-                          <div className="h-2 overflow-hidden rounded-full bg-white/5">
+                          <div className="h-2 overflow-hidden rounded-full bg-white/[0.06]">
                             <div
-                              className="h-full rounded-full"
+                              className="h-full rounded-full transition-all duration-500"
                               style={{
                                 width: `${Math.max(4, w.loadScore * 100)}%`,
                                 backgroundColor:
@@ -216,9 +216,15 @@ export function AIPanel({
 
 function Metric({ label, value, danger }: { label: string; value: string | number; danger?: boolean }) {
   return (
-    <div className="glass rounded-xl p-3">
-      <p className="text-xs text-gray-500">{label}</p>
-      <p className={`text-xl font-bold ${danger ? "text-red-300" : "text-gray-50"}`}>{value}</p>
+    <div
+      className={`rounded-xl border p-3 ${
+        danger ? "border-red-500/20 bg-red-500/5" : "border-white/[0.08] bg-white/[0.03]"
+      }`}
+    >
+      <p className="text-[11px] uppercase tracking-wide text-gray-500">{label}</p>
+      <p className={`mt-0.5 text-2xl font-bold tabular-nums ${danger ? "text-red-300" : "text-gray-50"}`}>
+        {value}
+      </p>
     </div>
   );
 }
