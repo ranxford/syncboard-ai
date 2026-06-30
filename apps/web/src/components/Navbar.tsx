@@ -15,7 +15,7 @@ export function Navbar({ children }: { children?: React.ReactNode }) {
       <div className="flex h-14 items-center justify-between gap-4 px-4 md:px-6">
         <div className="flex items-center gap-4">
           <Link href="/dashboard" className="flex items-center gap-2 font-bold">
-            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-brand-500">
+            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-brand-gradient shadow-glow">
               <Zap className="h-4 w-4" />
             </span>
             <span className="hidden sm:inline">

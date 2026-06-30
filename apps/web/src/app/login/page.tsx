@@ -54,7 +54,7 @@ export default function LoginPage() {
         className="glass card-shadow relative z-10 w-full max-w-md rounded-2xl p-8"
       >
         <Link href="/" className="mb-6 flex items-center gap-2 text-lg font-bold">
-          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-500">
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-gradient shadow-glow">
             <Zap className="h-4 w-4" />
           </span>
           SyncBoard <span className="text-brand-400">AI+</span>
