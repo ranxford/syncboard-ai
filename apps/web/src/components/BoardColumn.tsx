@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type DragEvent } from "react";
 import { AlertTriangle, Plus } from "lucide-react";
 import type { Column, PresenceUser, Task } from "@/lib/types";
 import { TaskCard } from "./TaskCard";
@@ -27,7 +27,7 @@ export function BoardColumn({
   draggingId: string | null;
   onCardClick: (task: Task) => void;
   onAddTask: (columnId: string) => void;
-  onDragStart: (taskId: string) => void;
+  onDragStart: (taskId: string, e: DragEvent) => void;
   onDragEnd: () => void;
   onDropBeforeTask: (columnId: string, targetTaskId: string) => void;
   onDropToEnd: (columnId: string) => void;
@@ -93,7 +93,7 @@ export function BoardColumn({
               watchers={watchersByTask[task.id] ?? []}
               dragging={draggingId === task.id}
               onClick={() => onCardClick(task)}
-              onDragStart={() => onDragStart(task.id)}
+              onDragStart={(e) => onDragStart(task.id, e)}
               onDragEnd={onDragEnd}
             />
           </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type DragEvent } from "react";
 import { getSocket } from "@/lib/socket";
 import { useBoard } from "@/store/board";
 import { useAuth } from "@/store/auth";
@@ -101,8 +101,15 @@ export function KanbanBoard({
     setDraggingId(null);
   }
 
-  function handleDragStart(taskId: string) {
+  function handleDragStart(taskId: string, e: DragEvent) {
     setDraggingId(taskId);
+    // Firefox/Safari require dataTransfer to be initialized or the drag never starts.
+    try {
+      e.dataTransfer.setData("text/plain", taskId);
+      e.dataTransfer.effectAllowed = "move";
+    } catch {
+      /* some browsers throw if accessed outside a real drag */
+    }
     getSocket().emit("task:focus", taskId);
   }
 

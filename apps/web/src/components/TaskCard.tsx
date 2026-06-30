@@ -1,5 +1,6 @@
 "use client";
 
+import { type DragEvent } from "react";
 import { motion } from "framer-motion";
 import { Calendar, CheckCircle2, Clock } from "lucide-react";
 import type { PresenceUser, Task } from "@/lib/types";
@@ -19,7 +20,7 @@ export function TaskCard({
   done?: boolean;
   watchers: PresenceUser[];
   onClick: () => void;
-  onDragStart: () => void;
+  onDragStart: (e: DragEvent) => void;
   onDragEnd: () => void;
   dragging: boolean;
 }) {
@@ -31,8 +32,8 @@ export function TaskCard({
     <motion.div
       layout
       draggable
-      onDragStart={onDragStart}
-      onDragEnd={onDragEnd}
+      onDragStartCapture={onDragStart}
+      onDragEndCapture={onDragEnd}
       onClick={onClick}
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: dragging ? 0.4 : 1, y: 0 }}

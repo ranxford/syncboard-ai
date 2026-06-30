@@ -315,8 +315,9 @@ export function TaskModal({
                       {c.user.id === currentUser?.id && (
                         <button
                           onClick={() => removeComment(c.id)}
-                          className="ml-auto text-gray-600 opacity-0 transition-opacity hover:text-red-300 group-hover:opacity-100"
+                          className="ml-auto rounded text-gray-500 opacity-70 transition-opacity hover:text-red-300 hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-red-400 md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100"
                           title="Delete comment"
+                          aria-label={`Delete comment by ${c.user.name}`}
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                         </button>
