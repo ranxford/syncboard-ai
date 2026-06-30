@@ -121,6 +121,8 @@ export function TaskModal({
       if (isEdit && task) await updateTask(task.id, payload);
       else if (columnId) await createTask(columnId, payload);
       onClose();
+    } catch {
+      // Failure already surfaced via toast; keep the modal open so edits aren't lost.
     } finally {
       setBusy(false);
     }
@@ -132,6 +134,8 @@ export function TaskModal({
     try {
       await deleteTask(task.id);
       onClose();
+    } catch {
+      // Failure already surfaced via toast.
     } finally {
       setBusy(false);
     }

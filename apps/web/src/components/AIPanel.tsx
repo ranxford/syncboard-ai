@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { useBoard } from "@/store/board";
+import { toast } from "@/store/toast";
 import { useEscape } from "@/lib/useEscape";
 import type { AnalyticsResult, Insight } from "@/lib/types";
 
@@ -56,9 +57,14 @@ export function AIPanel({
     if (open) load();
   }, [open, load]);
 
-  async function applyRebalance(taskId: string, toUserId: string) {
-    await updateTask(taskId, { assigneeId: toUserId });
-    await load();
+  async function applyRebalance(taskId: string, toUserId: string, toName: string) {
+    try {
+      await updateTask(taskId, { assigneeId: toUserId });
+      toast.success(`Reassigned to ${toName}.`);
+      await load();
+    } catch {
+      // Failure already surfaced via toast.
+    }
   }
 
   return (
@@ -158,7 +164,7 @@ export function AIPanel({
                             </div>
                             <p className="mb-2 text-[11px] text-gray-500">{r.reason}</p>
                             <button
-                              onClick={() => applyRebalance(r.taskId, r.toUserId)}
+                              onClick={() => applyRebalance(r.taskId, r.toUserId, r.toName)}
                               className="btn-ghost w-full py-1 text-xs"
                             >
                               Reassign to {r.toName}

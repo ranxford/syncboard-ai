@@ -4,6 +4,7 @@ import { useState } from "react";
 import { UserPlus } from "lucide-react";
 import { useBoard } from "@/store/board";
 import { api } from "@/lib/api";
+import { toast } from "@/store/toast";
 import { Avatar } from "./Avatar";
 
 export function PresenceBar({ projectId }: { projectId: string }) {
@@ -19,6 +20,7 @@ export function PresenceBar({ projectId }: { projectId: string }) {
     try {
       const { board } = await api.addMember(projectId, email.trim());
       applyServerBoard(board);
+      toast.success(`Added ${email.trim()} to the project.`);
       setEmail("");
       setAdding(false);
     } catch (err: any) {

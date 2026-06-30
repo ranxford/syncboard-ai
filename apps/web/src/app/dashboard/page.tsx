@@ -5,6 +5,7 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { CalendarClock, FolderKanban, Plus, Trash2, Users } from "lucide-react";
 import { api } from "@/lib/api";
+import { toast } from "@/store/toast";
 import type { MyTask, ProjectSummary } from "@/lib/types";
 import { PRIORITY_STYLES, dueLabel } from "@/lib/ui";
 import { AuthGate } from "@/components/AuthGate";
@@ -35,8 +36,13 @@ function DashboardInner() {
 
   async function removeProject(id: string, name: string) {
     if (!window.confirm(`Delete "${name}" and all its tasks? This cannot be undone.`)) return;
-    await api.deleteProject(id);
-    await load();
+    try {
+      await api.deleteProject(id);
+      toast.success(`"${name}" deleted.`);
+      await load();
+    } catch (e: any) {
+      toast.error(e?.message ?? "Couldn't delete the project.");
+    }
   }
 
   async function createProject(e: React.FormEvent) {
@@ -45,10 +51,13 @@ function DashboardInner() {
     setBusy(true);
     try {
       await api.createProject({ name: name.trim(), description: description.trim() });
+      toast.success(`Project "${name.trim()}" created.`);
       setName("");
       setDescription("");
       setCreating(false);
       await load();
+    } catch (e: any) {
+      toast.error(e?.message ?? "Couldn't create the project.");
     } finally {
       setBusy(false);
     }

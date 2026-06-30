@@ -1,9 +1,20 @@
 import { create } from "zustand";
 import { api, NetworkError } from "@/lib/api";
 import { enqueue, flushQueue, loadQueue } from "@/lib/offlineQueue";
+import { toast } from "@/store/toast";
 import type { Board, Column, Priority, PresenceUser, Task } from "@/lib/types";
 
 type Connection = "online" | "offline";
+
+/** Announce the first transition into offline so queued edits aren't a surprise. */
+function noteOffline(prevConnection: Connection) {
+  if (prevConnection !== "offline") {
+    toast.info("You're offline — changes are queued and will sync when you reconnect.");
+  }
+}
+function noteError(e: unknown) {
+  toast.error(e instanceof Error && e.message ? e.message : "Something went wrong. Please try again.");
+}
 
 interface BoardState {
   projectId: string | null;
@@ -135,9 +146,12 @@ export const useBoard = create<BoardState>((set, get) => ({
       get().applyServerBoard(res.board);
     } catch (e) {
       if (e instanceof NetworkError) {
+        const prev = get().connection;
         enqueue(projectId, { kind: "create", tempId, projectId, columnId, data });
         set({ connection: "offline", pendingCount: loadQueue(projectId).length });
+        noteOffline(prev);
       } else {
+        noteError(e);
         throw e;
       }
     }
@@ -172,9 +186,12 @@ export const useBoard = create<BoardState>((set, get) => ({
       get().applyServerBoard(res.board);
     } catch (e) {
       if (e instanceof NetworkError) {
+        const prev = get().connection;
         enqueue(projectId, { kind: "update", taskId, data });
         set({ connection: "offline", pendingCount: loadQueue(projectId).length });
+        noteOffline(prev);
       } else {
+        noteError(e);
         throw e;
       }
     }
@@ -199,9 +216,12 @@ export const useBoard = create<BoardState>((set, get) => ({
       get().applyServerBoard(res.board);
     } catch (e) {
       if (e instanceof NetworkError) {
+        const prev = get().connection;
         enqueue(projectId, { kind: "move", taskId, columnId: toColumnId, index });
         set({ connection: "offline", pendingCount: loadQueue(projectId).length });
+        noteOffline(prev);
       } else {
+        noteError(e);
         throw e;
       }
     }
@@ -216,9 +236,12 @@ export const useBoard = create<BoardState>((set, get) => ({
       get().applyServerBoard(res.board);
     } catch (e) {
       if (e instanceof NetworkError) {
+        const prev = get().connection;
         enqueue(projectId, { kind: "delete", taskId });
         set({ connection: "offline", pendingCount: loadQueue(projectId).length });
+        noteOffline(prev);
       } else {
+        noteError(e);
         throw e;
       }
     }
@@ -238,6 +261,7 @@ export const useBoard = create<BoardState>((set, get) => ({
       return;
     }
     set({ syncing: true });
+    const synced = pendingCount;
     const result = await flushQueue(projectId);
     set({
       syncing: false,
@@ -251,6 +275,7 @@ export const useBoard = create<BoardState>((set, get) => ({
       } catch {
         /* ignore */
       }
+      toast.success(`All caught up — ${synced} change${synced === 1 ? "" : "s"} synced.`);
     } else if (result.board) {
       set({ board: result.board });
     }

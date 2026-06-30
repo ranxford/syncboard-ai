@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { ListChecks, Sparkles, X } from "lucide-react";
 import { api } from "@/lib/api";
 import { useBoard } from "@/store/board";
+import { toast } from "@/store/toast";
 import { useEscape } from "@/lib/useEscape";
 import type { Column, Member, MeetingResult, Priority } from "@/lib/types";
 import { PRIORITY_STYLES } from "@/lib/ui";
@@ -74,6 +75,9 @@ export function MeetingModal({
       const { board } = await api.importTasks(projectId, columnId, items);
       applyServerBoard(board);
       setImported(items.length);
+      toast.success(`Imported ${items.length} task${items.length === 1 ? "" : "s"} to the board.`);
+    } catch (e: any) {
+      toast.error(e?.message ?? "Couldn't import tasks.");
     } finally {
       setBusy(false);
     }

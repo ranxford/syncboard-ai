@@ -9,6 +9,7 @@ import type { Board, PresenceUser, Task } from "@/lib/types";
 import { AuthGate } from "@/components/AuthGate";
 import { Navbar } from "@/components/Navbar";
 import { KanbanBoard } from "@/components/KanbanBoard";
+import { BoardSkeleton } from "@/components/BoardSkeleton";
 import { BoardSearch } from "@/components/BoardSearch";
 import { PresenceBar } from "@/components/PresenceBar";
 import { ConnectivityBadge } from "@/components/ConnectivityBadge";
@@ -129,9 +130,7 @@ function BoardInner({ projectId }: { projectId: string }) {
       <div className="flex flex-1 overflow-hidden">
         <div className="flex-1 overflow-hidden">
           {loading ? (
-            <div className="flex h-full items-center justify-center">
-              <div className="h-8 w-8 animate-spin rounded-full border-2 border-brand-500 border-t-transparent" />
-            </div>
+            <BoardSkeleton />
           ) : error ? (
             <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
               <p className="text-red-300">{error}</p>
