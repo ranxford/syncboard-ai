@@ -78,7 +78,10 @@ const previewColumns = [
 
 export default function Landing() {
   const status = useAuth((s) => s.status);
-  const cta = status === "authenticated" ? "/dashboard" : "/login";
+  const authed = status === "authenticated";
+  // Primary "get started" funnels new users to signup; nav "sign in" to login.
+  const startCta = authed ? "/dashboard" : "/signup";
+  const signInCta = authed ? "/dashboard" : "/login";
 
   return (
     <main className="relative overflow-hidden">
@@ -98,8 +101,8 @@ export default function Landing() {
             <a href="#features" className="transition-colors hover:text-gray-100">Features</a>
             <a href="#preview" className="transition-colors hover:text-gray-100">Preview</a>
           </div>
-          <Link href={cta} className="btn-primary">
-            {status === "authenticated" ? "Open app" : "Sign in"}
+          <Link href={signInCta} className="btn-primary">
+            {authed ? "Open app" : "Sign in"}
             <ArrowRight className="h-4 w-4" />
           </Link>
         </div>
@@ -145,7 +148,7 @@ export default function Landing() {
           transition={{ duration: 0.6, delay: 0.18 }}
           className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row"
         >
-          <Link href={cta} className="btn-primary px-6 py-3 text-base">
+          <Link href={startCta} className="btn-primary px-6 py-3 text-base">
             Get started free
             <ArrowRight className="h-4 w-4" />
           </Link>
@@ -255,7 +258,7 @@ export default function Landing() {
             <p className="mx-auto mt-3 max-w-xl text-gray-400">
               Spin up a board in seconds. No credit card, no setup — just real-time collaboration.
             </p>
-            <Link href={cta} className="btn-primary mt-7 px-6 py-3 text-base">
+            <Link href={startCta} className="btn-primary mt-7 px-6 py-3 text-base">
               Get started free
               <ArrowRight className="h-4 w-4" />
             </Link>
