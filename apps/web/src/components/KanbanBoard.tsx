@@ -1,12 +1,19 @@
 "use client";
 
-import { useMemo, useState, type DragEvent } from "react";
+import { useCallback, useEffect, useMemo, useState, type DragEvent } from "react";
 import { getSocket } from "@/lib/socket";
 import { useBoard } from "@/store/board";
 import { useAuth } from "@/store/auth";
 import type { PresenceUser, Task } from "@/lib/types";
 import { BoardColumn } from "./BoardColumn";
-import { BoardFilters, EMPTY_FILTERS, isFilterActive, type BoardFilterState } from "./BoardFilters";
+import {
+  BoardFilters,
+  EMPTY_FILTERS,
+  filtersFromSearch,
+  filtersToSearch,
+  isFilterActive,
+  type BoardFilterState,
+} from "./BoardFilters";
 
 export function KanbanBoard({
   onEditTask,
@@ -22,6 +29,21 @@ export function KanbanBoard({
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [filters, setFilters] = useState<BoardFilterState>(EMPTY_FILTERS);
 
+  // Hydrate filters from the URL on mount (kept out of the initial render to
+  // avoid an SSR/client hydration mismatch).
+  useEffect(() => {
+    const fromUrl = filtersFromSearch(window.location.search);
+    if (isFilterActive(fromUrl)) setFilters(fromUrl);
+  }, []);
+
+  // Mirror active filters into the URL so a reload or shared link restores them.
+  const applyFilters = useCallback((next: BoardFilterState) => {
+    setFilters(next);
+    const qs = filtersToSearch(next);
+    const url = qs ? `${window.location.pathname}?${qs}` : window.location.pathname;
+    window.history.replaceState(null, "", url);
+  }, []);
+
   const allLabels = useMemo(() => {
     if (!board) return [] as string[];
     const set = new Set<string>();
@@ -32,6 +54,9 @@ export function KanbanBoard({
   const matchesFilters = useMemo(() => {
     return (task: Task) => {
       if (filters.labels.length > 0 && !filters.labels.some((l) => task.labels.includes(l))) {
+        return false;
+      }
+      if (filters.priorities.length > 0 && !filters.priorities.includes(task.priority)) {
         return false;
       }
       if (filters.assigneeId === "unassigned") return task.assigneeId == null;
@@ -127,7 +152,7 @@ export function KanbanBoard({
         members={board.members}
         currentUserId={currentUserId}
         filters={filters}
-        onChange={setFilters}
+        onChange={applyFilters}
         shown={shownCount}
         total={totalCount}
       />

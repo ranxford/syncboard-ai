@@ -1,17 +1,41 @@
 "use client";
 
 import { Filter, X } from "lucide-react";
-import type { Member } from "@/lib/types";
+import type { Member, Priority } from "@/lib/types";
+import { PRIORITY_STYLES } from "@/lib/ui";
+
+const PRIORITIES: Priority[] = ["low", "medium", "high", "urgent"];
 
 export interface BoardFilterState {
   labels: string[];
-  assigneeId: string | null; // null = anyone, "me" handled by caller mapping, "unassigned" sentinel
+  assigneeId: string | null; // null = anyone, "unassigned" sentinel, otherwise a user id
+  priorities: Priority[];
 }
 
-export const EMPTY_FILTERS: BoardFilterState = { labels: [], assigneeId: null };
+export const EMPTY_FILTERS: BoardFilterState = { labels: [], assigneeId: null, priorities: [] };
 
 export function isFilterActive(f: BoardFilterState): boolean {
-  return f.labels.length > 0 || f.assigneeId !== null;
+  return f.labels.length > 0 || f.assigneeId !== null || f.priorities.length > 0;
+}
+
+// ── URL (de)serialization so filters survive reload and are shareable ──
+export function filtersToSearch(f: BoardFilterState): string {
+  const p = new URLSearchParams();
+  if (f.labels.length) p.set("labels", f.labels.join(","));
+  if (f.priorities.length) p.set("priority", f.priorities.join(","));
+  if (f.assigneeId) p.set("assignee", f.assigneeId);
+  return p.toString();
+}
+
+export function filtersFromSearch(search: string): BoardFilterState {
+  const p = new URLSearchParams(search);
+  const labels = (p.get("labels") ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+  const priorities = (p.get("priority") ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter((s): s is Priority => (PRIORITIES as string[]).includes(s));
+  const assignee = p.get("assignee");
+  return { labels, priorities, assigneeId: assignee || null };
 }
 
 export function BoardFilters({
@@ -41,13 +65,45 @@ export function BoardFilters({
     });
   }
 
+  function togglePriority(priority: Priority) {
+    const has = filters.priorities.includes(priority);
+    onChange({
+      ...filters,
+      priorities: has
+        ? filters.priorities.filter((p) => p !== priority)
+        : [...filters.priorities, priority],
+    });
+  }
+
   if (allLabels.length === 0 && members.length === 0) return null;
 
   return (
-    <div className="flex flex-wrap items-center gap-2 border-b border-white/10 px-4 py-2 md:px-6">
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-white/10 px-4 py-2 md:px-6">
       <span className="flex items-center gap-1 text-xs font-medium text-gray-400">
         <Filter className="h-3.5 w-3.5" /> Filter
       </span>
+
+      <div className="flex flex-wrap items-center gap-1.5">
+        {PRIORITIES.map((p) => {
+          const on = filters.priorities.includes(p);
+          const style = PRIORITY_STYLES[p];
+          return (
+            <button
+              key={p}
+              onClick={() => togglePriority(p)}
+              className={`flex items-center gap-1 rounded-full px-2.5 py-1 text-xs transition-colors ${
+                on ? "bg-white/15 text-white ring-1 ring-white/30" : "bg-white/5 text-gray-300 hover:bg-white/10"
+              }`}
+              aria-pressed={on}
+            >
+              <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: style.dot }} />
+              {style.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {allLabels.length > 0 && <span className="h-4 w-px bg-white/10" aria-hidden />}
 
       <div className="flex flex-wrap items-center gap-1.5">
         {allLabels.map((label) => {
@@ -57,9 +113,7 @@ export function BoardFilters({
               key={label}
               onClick={() => toggleLabel(label)}
               className={`rounded-full px-2.5 py-1 text-xs transition-colors ${
-                on
-                  ? "bg-brand-500 text-white"
-                  : "bg-white/5 text-gray-300 hover:bg-white/10"
+                on ? "bg-brand-500 text-white" : "bg-white/5 text-gray-300 hover:bg-white/10"
               }`}
               aria-pressed={on}
             >
