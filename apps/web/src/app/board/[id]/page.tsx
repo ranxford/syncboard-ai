@@ -117,7 +117,14 @@ function BoardInner({ projectId }: { projectId: string }) {
             />
           )}
           {board && <PresenceBar projectId={projectId} />}
-          <button onClick={() => setFeedOpen((v) => !v)} className="btn-ghost px-2.5 py-1.5" title="Activity">
+          <button
+            onClick={() => setFeedOpen((v) => !v)}
+            className={`btn-ghost px-2.5 py-1.5 ${
+              feedOpen ? "border-brand-500/40 bg-brand-500/10 text-brand-200" : ""
+            }`}
+            title="Activity"
+            aria-pressed={feedOpen}
+          >
             <History className="h-4 w-4" />
           </button>
           <button onClick={() => setAiOpen(true)} className="btn-primary">
