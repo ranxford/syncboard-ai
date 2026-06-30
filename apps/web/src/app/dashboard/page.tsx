@@ -176,10 +176,10 @@ function DashboardInner() {
                 )}
                 <Link
                   href={`/board/${p.id}`}
-                  className="glass card-shadow block h-full rounded-2xl p-5 transition-colors hover:border-brand-500/40"
+                  className="card card-shadow block h-full p-5 transition-all duration-200 hover:-translate-y-1 hover:border-brand-500/40 hover:shadow-soft"
                 >
                   <div className="mb-3 flex items-center justify-between">
-                    <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-500/15 text-brand-400">
+                    <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-500/15 text-brand-400 ring-1 ring-inset ring-brand-500/20">
                       <FolderKanban className="h-5 w-5" />
                     </span>
                     <span className="rounded-full bg-white/5 px-2 py-0.5 text-xs capitalize text-gray-400">

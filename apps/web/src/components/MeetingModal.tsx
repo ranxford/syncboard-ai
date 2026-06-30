@@ -81,18 +81,20 @@ export function MeetingModal({
 
   return (
     <div
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4 backdrop-blur-md"
       onClick={onClose}
     >
       <motion.div
         initial={{ opacity: 0, scale: 0.96 }}
         animate={{ opacity: 1, scale: 1 }}
         onClick={(e) => e.stopPropagation()}
-        className="glass card-shadow flex max-h-[90vh] w-full max-w-2xl flex-col rounded-2xl"
+        className="card card-shadow flex max-h-[90vh] w-full max-w-2xl flex-col"
       >
-        <div className="flex items-center justify-between border-b border-white/10 px-6 py-4">
+        <div className="flex items-center justify-between border-b border-white/10 bg-white/[0.02] px-6 py-4">
           <div className="flex items-center gap-2">
-            <Sparkles className="h-5 w-5 text-brand-400" />
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-500/15 text-brand-400 ring-1 ring-inset ring-brand-500/20">
+              <Sparkles className="h-4 w-4" />
+            </span>
             <h2 className="font-semibold text-gray-50">AI Meeting Intelligence</h2>
           </div>
           <button onClick={onClose} className="rounded-md p-1 text-gray-400 hover:bg-white/10">

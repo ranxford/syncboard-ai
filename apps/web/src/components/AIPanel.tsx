@@ -79,9 +79,9 @@ export function AIPanel({
             transition={{ type: "spring", damping: 28, stiffness: 260 }}
             className="fixed right-0 top-0 z-50 flex h-full w-full max-w-md flex-col border-l border-white/10 bg-ink-900"
           >
-            <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
+            <div className="flex items-center justify-between border-b border-white/10 bg-white/[0.02] px-5 py-4">
               <div className="flex items-center gap-2">
-                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-500/15 text-brand-400">
+                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-500/15 text-brand-400 ring-1 ring-inset ring-brand-500/20">
                   <Brain className="h-4 w-4" />
                 </span>
                 <h2 className="font-semibold text-gray-50">AI Insights</h2>

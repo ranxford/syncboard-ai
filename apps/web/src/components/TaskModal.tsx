@@ -139,14 +139,14 @@ export function TaskModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-md"
       onClick={onClose}
     >
       <motion.div
         initial={{ opacity: 0, scale: 0.96, y: 10 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         onClick={(e) => e.stopPropagation()}
-        className="glass card-shadow max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl p-6"
+        className="card card-shadow max-h-[90vh] w-full max-w-lg overflow-y-auto p-6"
       >
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-lg font-semibold text-gray-50">{isEdit ? "Edit task" : "New task"}</h2>
