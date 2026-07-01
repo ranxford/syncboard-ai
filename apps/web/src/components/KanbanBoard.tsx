@@ -1,11 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, type DragEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 import { getSocket } from "@/lib/socket";
+import { BOARD_ZOOM_STEP, clampBoardZoom } from "@/lib/boardZoom";
+import { useBoardZoomShortcuts } from "@/lib/useBoardZoomShortcuts";
 import { useBoard } from "@/store/board";
+import { useBoardZoom } from "@/store/boardZoom";
 import { useAuth } from "@/store/auth";
 import type { PresenceUser, Task } from "@/lib/types";
 import { BoardColumn } from "./BoardColumn";
+import { BoardZoomControls } from "./BoardZoomControls";
 import {
   BoardFilters,
   EMPTY_FILTERS,
@@ -28,6 +32,26 @@ export function KanbanBoard({
   const currentUserId = useAuth((s) => s.user?.id);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [filters, setFilters] = useState<BoardFilterState>(EMPTY_FILTERS);
+  const viewportRef = useRef<HTMLDivElement>(null);
+
+  const projectId = board?.project.id ?? "";
+  const zoom = useBoardZoom((s) => (projectId ? s.get(projectId) : 1));
+  useBoardZoomShortcuts(projectId);
+
+  // Ctrl/Cmd + scroll to zoom — needs a non-passive listener so preventDefault works.
+  useEffect(() => {
+    const el = viewportRef.current;
+    if (!el || !projectId) return;
+    function onWheel(e: WheelEvent) {
+      if (!e.ctrlKey && !e.metaKey) return;
+      e.preventDefault();
+      const current = useBoardZoom.getState().get(projectId);
+      const delta = e.deltaY > 0 ? -BOARD_ZOOM_STEP : BOARD_ZOOM_STEP;
+      useBoardZoom.getState().set(projectId, clampBoardZoom(current + delta));
+    }
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, [projectId]);
 
   // Hydrate filters from the URL on mount (kept out of the initial render to
   // avoid an SSR/client hydration mismatch).
@@ -145,8 +169,10 @@ export function KanbanBoard({
 
   const filtering = isFilterActive(filters);
 
+  const scale = 1 / zoom;
+
   return (
-    <div className="flex h-full flex-col overflow-hidden">
+    <div className="relative flex h-full flex-col overflow-hidden">
       <BoardFilters
         allLabels={allLabels}
         members={board.members}
@@ -156,24 +182,45 @@ export function KanbanBoard({
         shown={shownCount}
         total={totalCount}
       />
-      <div className="flex flex-1 gap-4 overflow-x-auto px-4 pb-4 pt-4 md:px-6">
-        {board.columns.map((column) => (
-          <BoardColumn
-            key={column.id}
-            column={column}
-            done={doneColumnIds.has(column.id)}
-            visibleTasks={filtering ? column.tasks.filter(matchesFilters) : column.tasks}
-            filtering={filtering}
-            watchersByTask={watchersByTask}
-            draggingId={draggingId}
-            onCardClick={onEditTask}
-            onAddTask={onAddTask}
-            onDragStart={handleDragStart}
-            onDragEnd={handleDragEnd}
-            onDropBeforeTask={handleDropBeforeTask}
-            onDropToEnd={handleDropToEnd}
+      <div ref={viewportRef} className="flex-1 overflow-auto">
+        <div
+          className="origin-top-left"
+          style={{
+            transform: `scale(${zoom})`,
+            width: `${scale * 100}%`,
+            minHeight: `${scale * 100}%`,
+          }}
+        >
+          <div className="flex gap-4 px-4 pb-4 pt-4 md:px-6">
+            {board.columns.map((column) => (
+              <BoardColumn
+                key={column.id}
+                column={column}
+                done={doneColumnIds.has(column.id)}
+                visibleTasks={filtering ? column.tasks.filter(matchesFilters) : column.tasks}
+                filtering={filtering}
+                watchersByTask={watchersByTask}
+                draggingId={draggingId}
+                onCardClick={onEditTask}
+                onAddTask={onAddTask}
+                onDragStart={handleDragStart}
+                onDragEnd={handleDragEnd}
+                onDropBeforeTask={handleDropBeforeTask}
+                onDropToEnd={handleDropToEnd}
+              />
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="pointer-events-none absolute bottom-4 left-4 z-10 md:left-6">
+        <div className="pointer-events-auto">
+          <BoardZoomControls
+            projectId={projectId}
+            columnCount={board.columns.length}
+            viewportRef={viewportRef}
           />
-        ))}
+        </div>
       </div>
     </div>
   );
