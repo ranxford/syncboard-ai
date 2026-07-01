@@ -14,6 +14,9 @@ export interface CallParticipant {
   avatarColor: string;
   micOn: boolean;
   camOn: boolean;
+  sharingScreen: boolean;
+  focusTaskId?: string | null;
+  focusTaskTitle?: string | null;
 }
 
 export type PublicParticipant = Omit<CallParticipant, never>;
@@ -43,13 +46,19 @@ class CallManager {
     return projectId;
   }
 
-  setMedia(socketId: string, micOn: boolean, camOn: boolean): CallParticipant | null {
+  setMedia(
+    socketId: string,
+    micOn: boolean,
+    camOn: boolean,
+    sharingScreen: boolean,
+  ): CallParticipant | null {
     const projectId = this.socketProject.get(socketId);
     if (!projectId) return null;
     const p = this.rooms.get(projectId)?.get(socketId);
     if (!p) return null;
     p.micOn = micOn;
     p.camOn = camOn;
+    p.sharingScreen = sharingScreen;
     return p;
   }
 

@@ -84,7 +84,13 @@ export function initSocket(httpServer: HttpServer): Server {
     socket.on(
       "call:join",
       async (
-        payload: { projectId: string; micOn?: boolean; camOn?: boolean },
+        payload: {
+          projectId: string;
+          micOn?: boolean;
+          camOn?: boolean;
+          focusTaskId?: string | null;
+          focusTaskTitle?: string | null;
+        },
         ack?: (res: { peers: ReturnType<typeof calls.list> } | { error: string }) => void,
       ) => {
         const projectId = payload?.projectId;
@@ -100,6 +106,9 @@ export function initSocket(httpServer: HttpServer): Server {
           avatarColor: user.avatarColor,
           micOn: payload.micOn ?? true,
           camOn: payload.camOn ?? true,
+          sharingScreen: false,
+          focusTaskId: payload.focusTaskId ?? null,
+          focusTaskTitle: payload.focusTaskTitle ?? null,
         };
         calls.join(projectId, self);
         socket.join(callRoomFor(projectId));
@@ -118,17 +127,26 @@ export function initSocket(httpServer: HttpServer): Server {
       io.to(to).emit("call:signal", { from: socket.id, data });
     });
 
-    socket.on("call:media", (payload: { micOn: boolean; camOn: boolean }) => {
-      const p = calls.setMedia(socket.id, !!payload?.micOn, !!payload?.camOn);
-      const projectId = calls.projectOf(socket.id);
-      if (p && projectId) {
-        socket.to(callRoomFor(projectId)).emit("call:peer-media", {
-          socketId: socket.id,
-          micOn: p.micOn,
-          camOn: p.camOn,
-        });
-      }
-    });
+    socket.on(
+      "call:media",
+      (payload: { micOn: boolean; camOn: boolean; sharingScreen?: boolean }) => {
+        const p = calls.setMedia(
+          socket.id,
+          !!payload?.micOn,
+          !!payload?.camOn,
+          !!payload?.sharingScreen,
+        );
+        const projectId = calls.projectOf(socket.id);
+        if (p && projectId) {
+          socket.to(callRoomFor(projectId)).emit("call:peer-media", {
+            socketId: socket.id,
+            micOn: p.micOn,
+            camOn: p.camOn,
+            sharingScreen: p.sharingScreen,
+          });
+        }
+      },
+    );
 
     function leaveCall() {
       const projectId = calls.leaveSocket(socket.id);

@@ -19,6 +19,7 @@ import { AIPanel } from "@/components/AIPanel";
 import { MeetingModal } from "@/components/MeetingModal";
 import { ActivityFeed } from "@/components/ActivityFeed";
 import { CallPanel } from "@/components/CallPanel";
+import { SyncRoomWrapUp } from "@/components/syncroom/SyncRoomWrapUp";
 
 function BoardInner({ projectId }: { projectId: string }) {
   const {
@@ -41,8 +42,12 @@ function BoardInner({ projectId }: { projectId: string }) {
   const [feedOpen, setFeedOpen] = useState(false);
   const [activityKey, setActivityKey] = useState(0);
 
-  const callStatus = useCall((s) => s.status);
+  const callPhase = useCall((s) => s.phase);
   const callRoster = useCall((s) => s.roster);
+  const wrapUpOpen = useCall((s) => s.wrapUpOpen);
+  const sessionLog = useCall((s) => s.sessionLog);
+  const contextTask = useCall((s) => s.contextTask);
+  const dismissWrapUp = useCall((s) => s.dismissWrapUp);
 
   useEffect(() => {
     init(projectId);
@@ -127,20 +132,29 @@ function BoardInner({ projectId }: { projectId: string }) {
           <button
             onClick={() => {
               const call = useCall.getState();
-              if (call.status === "idle") void call.join();
-              else call.setMinimized(false);
+              if (call.phase === "in-call" || call.phase === "lobby" || call.phase === "connecting") {
+                call.setViewMode(call.viewMode === "minimized" ? "expanded" : call.viewMode);
+              } else {
+                void call.openLobby();
+              }
             }}
             className={`btn-ghost relative px-2.5 py-1.5 ${
-              callStatus !== "idle"
+              callPhase !== "idle"
                 ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-300"
                 : callRoster.length > 0
                   ? "border-emerald-500/40 text-emerald-300"
                   : ""
             }`}
-            title={callStatus !== "idle" ? "Open meeting" : callRoster.length > 0 ? "Join meeting in progress" : "Start meeting"}
+            title={
+              callPhase !== "idle"
+                ? "Open SyncRoom"
+                : callRoster.length > 0
+                  ? "Join SyncRoom in progress"
+                  : "Open project SyncRoom"
+            }
           >
             <Video className="h-4 w-4" />
-            {callStatus === "idle" && callRoster.length > 0 && (
+            {callPhase === "idle" && callRoster.length > 0 && (
               <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-emerald-500 px-1 text-[10px] font-semibold text-white">
                 {callRoster.length}
               </span>
@@ -211,6 +225,10 @@ function BoardInner({ projectId }: { projectId: string }) {
             setAiOpen(false);
             setMeetingOpen(true);
           }}
+          onStartSyncRoom={(task) => {
+            setAiOpen(false);
+            void useCall.getState().openLobby({ task });
+          }}
         />
       )}
 
@@ -224,6 +242,13 @@ function BoardInner({ projectId }: { projectId: string }) {
       )}
 
       <CallPanel />
+
+      <SyncRoomWrapUp
+        open={wrapUpOpen}
+        sessionLog={sessionLog}
+        contextTask={contextTask}
+        onClose={dismissWrapUp}
+      />
     </div>
   );
 }

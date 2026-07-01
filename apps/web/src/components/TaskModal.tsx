@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Send, Trash2, X } from "lucide-react";
+import { Send, Trash2, Video, X } from "lucide-react";
 import { getSocket } from "@/lib/socket";
 import { api } from "@/lib/api";
 import { useBoard } from "@/store/board";
@@ -11,6 +11,8 @@ import { useEscape } from "@/lib/useEscape";
 import { relativeTime } from "@/lib/ui";
 import type { Comment, Member, Priority, Task } from "@/lib/types";
 import { Avatar } from "./Avatar";
+import { SyncRoomPresencePrompt } from "./syncroom/SyncRoomPresencePrompt";
+import { useSyncRoom } from "@/store/call";
 
 const PRIORITIES: Priority[] = ["low", "medium", "high", "urgent"];
 
@@ -158,6 +160,22 @@ export function TaskModal({
             <X className="h-5 w-5" />
           </button>
         </div>
+
+        {isEdit && task && (
+          <>
+            <SyncRoomPresencePrompt taskId={task.id} taskTitle={task.title} />
+            <button
+              type="button"
+              onClick={() => {
+                onClose();
+                void useSyncRoom.getState().openLobby({ task: { id: task.id, title: task.title } });
+              }}
+              className="btn-ghost mb-4 w-full border-brand-500/30 text-brand-200"
+            >
+              <Video className="h-4 w-4" /> Live discussion (SyncRoom)
+            </button>
+          </>
+        )}
 
         <form onSubmit={save} className="space-y-4">
           <div>

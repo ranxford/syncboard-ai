@@ -8,6 +8,7 @@ import {
   Brain,
   CheckCircle2,
   Info,
+  Radio,
   RefreshCw,
   Sparkles,
   X,
@@ -29,15 +30,18 @@ export function AIPanel({
   open,
   onClose,
   onOpenMeeting,
+  onStartSyncRoom,
 }: {
   projectId: string;
   open: boolean;
   onClose: () => void;
   onOpenMeeting: () => void;
+  onStartSyncRoom: (task: { id: string; title: string }) => void;
 }) {
   const [data, setData] = useState<AnalyticsResult | null>(null);
   const [loading, setLoading] = useState(false);
   const updateTask = useBoard((s) => s.updateTask);
+  const board = useBoard((s) => s.board);
 
   useEscape(() => {
     if (open) onClose();
@@ -103,12 +107,46 @@ export function AIPanel({
             </div>
 
             <div className="flex-1 space-y-6 overflow-y-auto p-5">
-              <button onClick={onOpenMeeting} className="btn-primary w-full">
-                <Sparkles className="h-4 w-4" /> Summarize a meeting
+              <button onClick={onOpenMeeting} className="btn-ghost w-full text-xs">
+                <Sparkles className="h-4 w-4" /> Import notes from a past session
               </button>
 
               {data && (
                 <>
+                  {/* Smart collaboration suggestions */}
+                  {data.insights.some((i) => i.taskIds?.length && /stagnat|block|overdue|deadline/i.test(i.type + i.title)) && (
+                    <section>
+                      <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                        Collaboration suggestions
+                      </h3>
+                      <div className="space-y-2">
+                        {data.insights
+                          .filter((i) => i.taskIds?.length)
+                          .slice(0, 3)
+                          .map((ins) => {
+                            const taskId = ins.taskIds![0];
+                            const task = board?.columns.flatMap((c) => c.tasks).find((t) => t.id === taskId);
+                            if (!task) return null;
+                            return (
+                              <div key={ins.id} className="glass rounded-xl p-3">
+                                <p className="text-sm text-gray-200">{ins.detail}</p>
+                                <button
+                                  onClick={() => {
+                                    onClose();
+                                    onStartSyncRoom({ id: task.id, title: task.title });
+                                  }}
+                                  className="btn-primary mt-2 w-full py-1.5 text-xs"
+                                >
+                                  <Radio className="h-3.5 w-3.5" /> Start SyncRoom on “{task.title}”
+                                </button>
+                              </div>
+                            );
+                          })
+                          .filter(Boolean)}
+                      </div>
+                    </section>
+                  )}
+
                   {/* Metrics */}
                   <section className="grid grid-cols-2 gap-3">
                     <Metric label="Completion" value={`${Math.round(data.metrics.completionRate * 100)}%`} />

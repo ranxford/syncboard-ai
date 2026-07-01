@@ -33,7 +33,7 @@ Workload balancing, rebalancing suggestions, and predictive risk detection — d
 | Feature | Description |
 | --- | --- |
 | **Real-time sync** | Every task change broadcasts instantly over Socket.io — no refresh needed. |
-| **Video meetings** | Built-in WebRTC audio/video huddles per board — mute, camera, and screen share, with a live "join" badge when a meeting is in progress. No third-party API. |
+| **SyncRoom** | Context-aware live collaboration per project or task — audio/video, screen share, AI session replay, and outcomes attached to work. |
 | **Live presence** | See who's online and which task each teammate is editing, in real time. |
 | **AI workflow prediction** | Detects stalled tasks, deadline risk, and WIP-limit breaches before they hurt delivery. |
 | **Smart task rebalancing** | Recommends optimal task reassignment based on live workload analysis. |
@@ -41,6 +41,7 @@ Workload balancing, rebalancing suggestions, and predictive risk detection — d
 | **Productivity analytics** | Completion rate, cycle time, throughput, and team workload at a glance. |
 | **Offline resilience** | Edits made while offline are queued locally and synced automatically on reconnect. |
 | **Connectivity meter** | Live latency / online / offline indicator with queued-change count. |
+| **Board zoom** | Zoom in/out on the Kanban canvas (60–150%), fit-all-columns, Ctrl+scroll, and per-project persistence. |
 
 ---
 
@@ -257,24 +258,40 @@ sections in `render.yaml` and `docker-compose.yml`.
 
 ---
 
-## 📹 How the video meetings work
+## 📹 SyncRoom — context-aware collaboration
 
-Each board has a built-in meeting room powered entirely by **WebRTC** — there is
-no Zoom/Twilio/Agora dependency and no media server.
+SyncBoard AI+ does **not** ship a generic Zoom clone. Every board has a **SyncRoom** —
+a live workspace that exists *because of the project*, not as a separate conferencing app.
 
-1. The Socket.io server acts purely as a **signaling relay**: it tracks who is in
-   each project's call and forwards SDP offers/answers and ICE candidates between
-   browsers. **Media never touches the server.**
-2. Topology is a **peer-to-peer mesh** — each participant holds one
-   `RTCPeerConnection` to every other participant. To avoid offer "glare", the
-   newcomer always initiates to existing peers.
-3. NAT traversal uses public **STUN** servers. For restrictive networks you can
-   add a TURN server to the `iceServers` config in `apps/web/src/store/call.ts`.
-4. Controls include mute, camera on/off, and **screen sharing** (via
-   `getDisplayMedia` + `RTCRtpSender.replaceTrack`). A live badge on the board
-   toolbar shows when a meeting is already in progress so others can hop in.
+### How it differs from video chat
+
+| Zoom-style meeting | SyncRoom |
+| --- | --- |
+| Scheduled call | Opens from the project or a specific task |
+| Ends when you hang up | **Session replay** timeline + optional AI wrap-up |
+| Notes live elsewhere | Summary, decisions, and action items attach to the task |
+| Generic “participants” | Presence prompts: “Mary is on this task — start SyncRoom?” |
+
+### What you can do today
+
+1. **Project SyncRoom** — open from the board toolbar; collaborate while moving cards and editing work.
+2. **Task live discussion** — every task has a “Live discussion (SyncRoom)” button.
+3. **Presence suggestions** — when teammates focus the same task, SyncRoom is one click away.
+4. **AI collaboration suggestions** — stalled/blocked tasks in AI Insights recommend starting a SyncRoom.
+5. **Session replay** — on leave, a timeline shows who joined, screen shares, and session flow.
+6. **AI wrap-up** — generate summary, decisions, and action items; attach them as a task comment.
+
+Under the hood: **WebRTC peer mesh** with Socket.io signaling only (media never hits the server).
+Optional `NEXT_PUBLIC_TURN_URL` for strict corporate NAT. Client code lives in
+`apps/web/src/lib/webrtc/` with one job per file.
 
 > Requires `https` in production (or `localhost` in dev) for camera/mic access.
+
+### Roadmap (not yet built)
+
+- Collaborative whiteboard linked to projects
+- Full session artifact linking (files, card moves in replay)
+- Automatic action-item import into the backlog
 
 ---
 
