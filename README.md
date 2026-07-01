@@ -33,6 +33,7 @@ Workload balancing, rebalancing suggestions, and predictive risk detection — d
 | Feature | Description |
 | --- | --- |
 | **Real-time sync** | Every task change broadcasts instantly over Socket.io — no refresh needed. |
+| **Video meetings** | Built-in WebRTC audio/video huddles per board — mute, camera, and screen share, with a live "join" badge when a meeting is in progress. No third-party API. |
 | **Live presence** | See who's online and which task each teammate is editing, in real time. |
 | **AI workflow prediction** | Detects stalled tasks, deadline risk, and WIP-limit breaches before they hurt delivery. |
 | **Smart task rebalancing** | Recommends optimal task reassignment based on live workload analysis. |
@@ -253,6 +254,27 @@ sections in `render.yaml` and `docker-compose.yml`.
    pending count.
 4. When connectivity returns (browser `online` event or socket reconnect), the
    queue is **replayed in order** and the board reconverges with the server.
+
+---
+
+## 📹 How the video meetings work
+
+Each board has a built-in meeting room powered entirely by **WebRTC** — there is
+no Zoom/Twilio/Agora dependency and no media server.
+
+1. The Socket.io server acts purely as a **signaling relay**: it tracks who is in
+   each project's call and forwards SDP offers/answers and ICE candidates between
+   browsers. **Media never touches the server.**
+2. Topology is a **peer-to-peer mesh** — each participant holds one
+   `RTCPeerConnection` to every other participant. To avoid offer "glare", the
+   newcomer always initiates to existing peers.
+3. NAT traversal uses public **STUN** servers. For restrictive networks you can
+   add a TURN server to the `iceServers` config in `apps/web/src/store/call.ts`.
+4. Controls include mute, camera on/off, and **screen sharing** (via
+   `getDisplayMedia` + `RTCRtpSender.replaceTrack`). A live badge on the board
+   toolbar shows when a meeting is already in progress so others can hop in.
+
+> Requires `https` in production (or `localhost` in dev) for camera/mic access.
 
 ---
 

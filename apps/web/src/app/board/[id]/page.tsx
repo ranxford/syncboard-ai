@@ -2,9 +2,10 @@
 
 import { use, useEffect, useState } from "react";
 import Link from "next/link";
-import { Brain, ChevronLeft, History } from "lucide-react";
+import { Brain, ChevronLeft, History, Video } from "lucide-react";
 import { getSocket, pingLatency } from "@/lib/socket";
 import { useBoard } from "@/store/board";
+import { useCall } from "@/store/call";
 import type { Board, PresenceUser, Task } from "@/lib/types";
 import { AuthGate } from "@/components/AuthGate";
 import { Navbar } from "@/components/Navbar";
@@ -17,6 +18,7 @@ import { TaskModal } from "@/components/TaskModal";
 import { AIPanel } from "@/components/AIPanel";
 import { MeetingModal } from "@/components/MeetingModal";
 import { ActivityFeed } from "@/components/ActivityFeed";
+import { CallPanel } from "@/components/CallPanel";
 
 function BoardInner({ projectId }: { projectId: string }) {
   const {
@@ -39,8 +41,12 @@ function BoardInner({ projectId }: { projectId: string }) {
   const [feedOpen, setFeedOpen] = useState(false);
   const [activityKey, setActivityKey] = useState(0);
 
+  const callStatus = useCall((s) => s.status);
+  const callRoster = useCall((s) => s.roster);
+
   useEffect(() => {
     init(projectId);
+    useCall.getState().observe(projectId);
 
     const socket = getSocket();
     const joinBoard = () => socket.emit("board:join", projectId);
@@ -84,6 +90,7 @@ function BoardInner({ projectId }: { projectId: string }) {
       window.removeEventListener("online", onOnline);
       window.removeEventListener("offline", onOffline);
       clearInterval(latencyTimer);
+      useCall.getState().unobserve();
       reset();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -117,6 +124,28 @@ function BoardInner({ projectId }: { projectId: string }) {
             />
           )}
           {board && <PresenceBar projectId={projectId} />}
+          <button
+            onClick={() => {
+              const call = useCall.getState();
+              if (call.status === "idle") void call.join();
+              else call.setMinimized(false);
+            }}
+            className={`btn-ghost relative px-2.5 py-1.5 ${
+              callStatus !== "idle"
+                ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-300"
+                : callRoster.length > 0
+                  ? "border-emerald-500/40 text-emerald-300"
+                  : ""
+            }`}
+            title={callStatus !== "idle" ? "Open meeting" : callRoster.length > 0 ? "Join meeting in progress" : "Start meeting"}
+          >
+            <Video className="h-4 w-4" />
+            {callStatus === "idle" && callRoster.length > 0 && (
+              <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-emerald-500 px-1 text-[10px] font-semibold text-white">
+                {callRoster.length}
+              </span>
+            )}
+          </button>
           <button
             onClick={() => setFeedOpen((v) => !v)}
             className={`btn-ghost px-2.5 py-1.5 ${
@@ -193,6 +222,8 @@ function BoardInner({ projectId }: { projectId: string }) {
           onClose={() => setMeetingOpen(false)}
         />
       )}
+
+      <CallPanel />
     </div>
   );
 }

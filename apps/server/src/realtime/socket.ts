@@ -5,7 +5,8 @@ import { prisma } from "../prisma.js";
 import { verifyToken } from "../lib/jwt.js";
 import { getMembership } from "../lib/access.js";
 import { presence } from "./presence.js";
-import { roomFor, setIo } from "./io.js";
+import { calls } from "./calls.js";
+import { callRoomFor, roomFor, setIo } from "./io.js";
 
 interface SocketUser {
   id: string;
@@ -59,6 +60,8 @@ export function initSocket(httpServer: HttpServer): Server {
         projectId,
         users: presence.list(projectId),
       });
+      // Let the newly-joined board viewer know if a meeting is already in progress.
+      socket.emit("call:participants", { projectId, participants: calls.list(projectId) });
     });
 
     socket.on("board:leave", (projectId: string) => {
@@ -68,6 +71,74 @@ export function initSocket(httpServer: HttpServer): Server {
         io.to(roomFor(pid)).emit("presence:updated", { projectId: pid, users: presence.list(pid) });
       }
     });
+
+    // ── Video meeting signaling (WebRTC) ──────────────────────────
+    // The server never sees media; it only relays SDP/ICE and tracks the roster.
+    function broadcastRoster(projectId: string) {
+      io.to(roomFor(projectId)).emit("call:participants", {
+        projectId,
+        participants: calls.list(projectId),
+      });
+    }
+
+    socket.on(
+      "call:join",
+      async (
+        payload: { projectId: string; micOn?: boolean; camOn?: boolean },
+        ack?: (res: { peers: ReturnType<typeof calls.list> } | { error: string }) => void,
+      ) => {
+        const projectId = payload?.projectId;
+        if (typeof projectId !== "string") return ack?.({ error: "bad-request" });
+        const membership = await getMembership(user.id, projectId);
+        if (!membership) return ack?.({ error: "forbidden" });
+
+        const peers = calls.list(projectId).filter((p) => p.socketId !== socket.id);
+        const self = {
+          socketId: socket.id,
+          userId: user.id,
+          name: user.name,
+          avatarColor: user.avatarColor,
+          micOn: payload.micOn ?? true,
+          camOn: payload.camOn ?? true,
+        };
+        calls.join(projectId, self);
+        socket.join(callRoomFor(projectId));
+
+        // Existing peers learn about the newcomer (they will NOT offer — the
+        // newcomer initiates to avoid offer glare).
+        socket.to(callRoomFor(projectId)).emit("call:peer-joined", { peer: self });
+        broadcastRoster(projectId);
+        ack?.({ peers });
+      },
+    );
+
+    socket.on("call:signal", (payload: { to: string; data: unknown }) => {
+      const { to, data } = payload ?? {};
+      if (typeof to !== "string" || !calls.sameCall(socket.id, to)) return;
+      io.to(to).emit("call:signal", { from: socket.id, data });
+    });
+
+    socket.on("call:media", (payload: { micOn: boolean; camOn: boolean }) => {
+      const p = calls.setMedia(socket.id, !!payload?.micOn, !!payload?.camOn);
+      const projectId = calls.projectOf(socket.id);
+      if (p && projectId) {
+        socket.to(callRoomFor(projectId)).emit("call:peer-media", {
+          socketId: socket.id,
+          micOn: p.micOn,
+          camOn: p.camOn,
+        });
+      }
+    });
+
+    function leaveCall() {
+      const projectId = calls.leaveSocket(socket.id);
+      if (!projectId) return;
+      socket.leave(callRoomFor(projectId));
+      io.to(callRoomFor(projectId)).emit("call:peer-left", { socketId: socket.id });
+      broadcastRoster(projectId);
+    }
+
+    socket.on("call:leave", () => leaveCall());
 
     // Live awareness: which task the user is currently editing/viewing.
     socket.on("task:focus", (taskId: string | null) => {
@@ -83,6 +154,7 @@ export function initSocket(httpServer: HttpServer): Server {
     });
 
     socket.on("disconnect", () => {
+      leaveCall();
       const affected = presence.leaveSocket(socket.id);
       for (const pid of affected) {
         io.to(roomFor(pid)).emit("presence:updated", { projectId: pid, users: presence.list(pid) });
