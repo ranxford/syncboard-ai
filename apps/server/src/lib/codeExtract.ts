@@ -36,6 +36,7 @@ export type ReviewSourceInput = {
   mimeType: string;
   storageKey: string;
   externalUrl: string;
+  note: string;
 };
 
 function isCodePath(path: string): boolean {

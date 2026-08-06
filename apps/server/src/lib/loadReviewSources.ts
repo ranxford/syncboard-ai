@@ -16,5 +16,6 @@ export async function loadMemberReviewSources(
     mimeType: r.mimeType,
     storageKey: r.storageKey,
     externalUrl: r.externalUrl,
+    note: r.note,
   }));
 }
