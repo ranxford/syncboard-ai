@@ -11,20 +11,31 @@ teams coordinated, even in low-connectivity environments.
 
 ## 📸 Screenshots
 
-### Landing
-A modern marketing page with a live board preview, feature highlights, and clear calls to action.
+Screenshots reflect the current UI. Regenerate after UI changes with
+`node scripts/capture-screenshots.mjs` (requires the dev server on port 3000).
 
-![SyncBoard AI+ landing page](./docs/screenshots/landing.png)
+> Latest features (review workflow, alignment, landing refresh) live on
+> [`cursor/board-video-meetings`](https://github.com/ranxford/syncboard-ai/tree/cursor/board-video-meetings).
+
+### Landing
+Marketing page with a live board preview, field tags, and a getting-started guide.
+
+![SyncBoard landing page](./docs/screenshots/01-landing.png)
+
+### Dashboard
+Project list, assigned tasks, teammate awareness, and live SyncRoom indicators.
+
+![SyncBoard dashboard](./docs/screenshots/02-dashboard.png)
 
 ### Real-time Kanban board
-Drag-and-drop columns with priorities, labels, estimates, assignees, live presence, and WIP awareness.
+Drag-and-drop columns with priorities, labels, timelines, SyncRoom, and review tools.
 
-![SyncBoard AI+ Kanban board](./docs/screenshots/board.png)
+![SyncBoard Kanban board](./docs/screenshots/03-board.png)
 
 ### AI Insights
 Workload balancing, rebalancing suggestions, and predictive risk detection — derived live from board state.
 
-![SyncBoard AI+ AI Insights panel](./docs/screenshots/ai-insights.png)
+![SyncBoard AI Insights panel](./docs/screenshots/04-ai-insights.png)
 
 ---
 
@@ -268,6 +279,7 @@ sections in `render.yaml` and `docker-compose.yml`.
 | `npm run db:seed` | Re-seed demo data |
 | `npm run db:studio` | Open Prisma Studio |
 | `npm test` | Run the full server test suite (AI engine + label units + HTTP integration) |
+| `node scripts/capture-screenshots.mjs` | Refresh README screenshots (dev server must be running) |
 
 CI runs install → Prisma generate → lint → build → tests on every push/PR (see
 [`.github/workflows/ci.yml`](./.github/workflows/ci.yml)). The test suite includes
