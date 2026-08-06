@@ -265,7 +265,10 @@ async function main() {
   console.log("  • grace@syncboard.dev (admin)");
   console.log("  • linus@syncboard.dev (member)");
   console.log(`\nShared project: ${project.name}`);
-  console.log("Personal project: Ada’s notes\n");
+  console.log("Personal project: Ada’s notes");
+  console.log("\nRun: npm run dev");
+  console.log("  Web  → http://localhost:3000");
+  console.log(`  Board → http://localhost:3000/board/${project.id}\n`);
 }
 
 main()
