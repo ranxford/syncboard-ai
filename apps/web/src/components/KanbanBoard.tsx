@@ -8,6 +8,7 @@ import { useBoard } from "@/store/board";
 import { useBoardZoom } from "@/store/boardZoom";
 import { useAuth } from "@/store/auth";
 import type { PresenceUser, Task } from "@/lib/types";
+import { SOFTWARE_ONLY_LABELS, fieldLabel, suggestedLabelsForField } from "@/lib/projectFields";
 import { BoardColumn } from "./BoardColumn";
 import { BoardZoomControls } from "./BoardZoomControls";
 import {
@@ -70,13 +71,29 @@ export function KanbanBoard({
 
   const allLabels = useMemo(() => {
     if (!board) return [] as string[];
+    const tech = board.project.field === "technology";
     const set = new Set<string>();
-    for (const c of board.columns) for (const t of c.tasks) for (const l of t.labels) set.add(l);
+    for (const c of board.columns) {
+      for (const t of c.tasks) {
+        for (const l of t.labels) {
+          if (!tech && SOFTWARE_ONLY_LABELS.has(l.trim().toLowerCase())) continue;
+          set.add(l);
+        }
+      }
+    }
     return [...set].sort((a, b) => a.localeCompare(b));
   }, [board]);
 
+  const suggestedLabels = useMemo(
+    () => suggestedLabelsForField(board?.project.field),
+    [board?.project.field],
+  );
+
   const matchesFilters = useMemo(() => {
-    return (task: Task) => {
+    return (task: Task, columnId: string) => {
+      if (filters.columnIds.length > 0 && !filters.columnIds.includes(columnId)) {
+        return false;
+      }
       if (filters.labels.length > 0 && !filters.labels.some((l) => task.labels.includes(l))) {
         return false;
       }
@@ -96,7 +113,7 @@ export function KanbanBoard({
     for (const c of board.columns) {
       for (const t of c.tasks) {
         total += 1;
-        if (matchesFilters(t)) shown += 1;
+        if (matchesFilters(t, c.id)) shown += 1;
       }
     }
     return { totalCount: total, shownCount: shown };
@@ -175,14 +192,17 @@ export function KanbanBoard({
     <div className="relative flex h-full flex-col overflow-hidden">
       <BoardFilters
         allLabels={allLabels}
+        suggestedLabels={suggestedLabels}
+        columns={board.columns.map((c) => ({ id: c.id, name: c.name }))}
         members={board.members}
         currentUserId={currentUserId}
+        fieldLabel={fieldLabel(board.project.field)}
         filters={filters}
         onChange={applyFilters}
         shown={shownCount}
         total={totalCount}
       />
-      <div ref={viewportRef} className="flex-1 overflow-auto">
+      <div ref={viewportRef} className="board-canvas flex-1 overflow-auto">
         <div
           className="origin-top-left"
           style={{
@@ -191,13 +211,15 @@ export function KanbanBoard({
             minHeight: `${scale * 100}%`,
           }}
         >
-          <div className="flex gap-4 px-4 pb-4 pt-4 md:px-6">
+          <div className="flex gap-3 px-4 pb-6 pt-4 md:px-6">
             {board.columns.map((column) => (
               <BoardColumn
                 key={column.id}
                 column={column}
                 done={doneColumnIds.has(column.id)}
-                visibleTasks={filtering ? column.tasks.filter(matchesFilters) : column.tasks}
+                visibleTasks={
+                  filtering ? column.tasks.filter((t) => matchesFilters(t, column.id)) : column.tasks
+                }
                 filtering={filtering}
                 watchersByTask={watchersByTask}
                 draggingId={draggingId}

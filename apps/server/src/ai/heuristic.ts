@@ -24,13 +24,15 @@ const PRIORITY_WEIGHT: Record<string, number> = {
 };
 
 function isDoneColumn(col: AiColumn, allColumns: AiColumn[]): boolean {
-  if (/done|complete|shipped|closed|resolved/i.test(col.name)) return true;
+  if (/done|complete|shipped|closed|resolved|handover|delivered/i.test(col.name)) return true;
   const maxOrder = Math.max(...allColumns.map((c) => c.order));
   return col.order === maxOrder && allColumns.length > 1;
 }
 
 function isBacklogColumn(col: AiColumn): boolean {
-  return /backlog|todo|to do|ideas/i.test(col.name);
+  return /backlog|todo|to do|ideas|pipeline|intake|requests|exploration|submitted|planning/i.test(
+    col.name,
+  );
 }
 
 /**

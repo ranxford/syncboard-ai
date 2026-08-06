@@ -35,20 +35,18 @@ export function BoardColumn({
   const [over, setOver] = useState(false);
   const overLimit = column.wipLimit != null && column.tasks.length > column.wipLimit;
   const tasks = visibleTasks ?? column.tasks;
+  const accent = done ? "#22c55e" : overLimit ? "#f59e0b" : "#2a9d8f";
 
   return (
-    <div className="flex w-72 shrink-0 flex-col rounded-2xl border border-white/[0.06] bg-ink-900/50">
-      <div className="flex items-center justify-between px-3 py-2.5">
-        <div className="flex items-center gap-2">
-          <span
-            className="h-2 w-2 rounded-full"
-            style={{ backgroundColor: done ? "#22c55e" : overLimit ? "#f59e0b" : "#6366f1" }}
-          />
-          <h3 className="text-sm font-semibold text-gray-200">{column.name}</h3>
-          <span className="rounded-full bg-white/5 px-2 py-0.5 text-xs tabular-nums text-gray-400">
+    <div className="board-column">
+      <div className="board-column-header">
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: accent }} />
+          <h3 className="truncate text-[13px] font-semibold text-gray-200">{column.name}</h3>
+          <span className="pill tabular-nums">
             {filtering
               ? `${tasks.length}/${column.tasks.length}`
-              : `${column.tasks.length}${column.wipLimit != null ? `/${column.wipLimit}` : ""}`}
+              : `${column.tasks.length}${column.wipLimit != null ? ` / ${column.wipLimit}` : ""}`}
           </span>
           {overLimit && (
             <span title="Over WIP limit">
@@ -57,8 +55,9 @@ export function BoardColumn({
           )}
         </div>
         <button
+          type="button"
           onClick={() => onAddTask(column.id)}
-          className="rounded-md p-1 text-gray-400 transition-colors hover:bg-white/10 hover:text-gray-200"
+          className="rounded p-1 text-gray-500 transition-colors hover:bg-white/[0.06] hover:text-gray-200"
           title="Add task"
         >
           <Plus className="h-4 w-4" />
@@ -76,8 +75,8 @@ export function BoardColumn({
           setOver(false);
           onDropToEnd(column.id);
         }}
-        className={`flex min-h-[120px] flex-1 flex-col gap-2 rounded-b-2xl border-2 border-dashed p-2 transition-colors ${
-          over ? "border-brand-500/60 bg-brand-500/5" : "border-transparent"
+        className={`flex min-h-[140px] flex-1 flex-col gap-2 p-2 transition-colors ${
+          over ? "rounded-b-lg bg-brand-500/[0.06] ring-1 ring-inset ring-brand-500/20" : ""
         }`}
       >
         {tasks.map((task) => (
@@ -87,7 +86,6 @@ export function BoardColumn({
             onDrop={(e) => {
               e.preventDefault();
               e.stopPropagation();
-              setOver(false);
               onDropBeforeTask(column.id, task.id);
             }}
           >
@@ -95,25 +93,18 @@ export function BoardColumn({
               task={task}
               done={done}
               watchers={watchersByTask[task.id] ?? []}
-              dragging={draggingId === task.id}
               onClick={() => onCardClick(task)}
               onDragStart={(e) => onDragStart(task.id, e)}
               onDragEnd={onDragEnd}
+              dragging={draggingId === task.id}
             />
           </div>
         ))}
-
-        {tasks.length === 0 &&
-          (filtering ? (
-            <p className="py-6 text-center text-xs text-gray-600">No matching tasks</p>
-          ) : (
-            <button
-              onClick={() => onAddTask(column.id)}
-              className="rounded-lg border border-dashed border-white/10 py-6 text-xs text-gray-500 hover:border-white/20 hover:text-gray-300"
-            >
-              + Add a task
-            </button>
-          ))}
+        {tasks.length === 0 && (
+          <p className="px-2 py-6 text-center text-xs text-gray-600">
+            {filtering ? "No matching tasks" : "Drop tasks here"}
+          </p>
+        )}
       </div>
     </div>
   );

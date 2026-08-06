@@ -8,6 +8,7 @@ import {
   Brain,
   CheckCircle2,
   Info,
+  Radio,
   RefreshCw,
   Sparkles,
   X,
@@ -16,7 +17,8 @@ import { api } from "@/lib/api";
 import { useBoard } from "@/store/board";
 import { toast } from "@/store/toast";
 import { useEscape } from "@/lib/useEscape";
-import type { AnalyticsResult, Insight } from "@/lib/types";
+import type { AnalyticsResult, Insight, Priority, Task } from "@/lib/types";
+import { findColumnByName } from "@/lib/boardColumns";
 
 const SEVERITY: Record<Insight["severity"], { icon: typeof Info; color: string }> = {
   info: { icon: Info, color: "text-sky-400" },
@@ -29,15 +31,21 @@ export function AIPanel({
   open,
   onClose,
   onOpenMeeting,
+  onStartSyncRoom,
+  onOpenAlignment,
 }: {
   projectId: string;
   open: boolean;
   onClose: () => void;
   onOpenMeeting: () => void;
+  onStartSyncRoom: (task: { id: string; title: string }) => void;
+  onOpenAlignment?: () => void;
 }) {
   const [data, setData] = useState<AnalyticsResult | null>(null);
   const [loading, setLoading] = useState(false);
   const updateTask = useBoard((s) => s.updateTask);
+  const moveTask = useBoard((s) => s.moveTask);
+  const board = useBoard((s) => s.board);
 
   useEscape(() => {
     if (open) onClose();
@@ -61,6 +69,20 @@ export function AIPanel({
     try {
       await updateTask(taskId, { assigneeId: toUserId });
       toast.success(`Reassigned to ${toName}.`);
+      await load();
+    } catch {
+      // Failure already surfaced via toast.
+    }
+  }
+
+  function taskById(taskId: string): Task | undefined {
+    return board?.columns.flatMap((c) => c.tasks).find((t) => t.id === taskId);
+  }
+
+  async function runInsightAction(label: string, fn: () => Promise<void>) {
+    try {
+      await fn();
+      toast.success(label);
       await load();
     } catch {
       // Failure already surfaced via toast.
@@ -103,12 +125,46 @@ export function AIPanel({
             </div>
 
             <div className="flex-1 space-y-6 overflow-y-auto p-5">
-              <button onClick={onOpenMeeting} className="btn-primary w-full">
-                <Sparkles className="h-4 w-4" /> Summarize a meeting
+              <button onClick={onOpenMeeting} className="btn-ghost w-full text-xs">
+                <Sparkles className="h-4 w-4" /> Import notes from a past session
               </button>
 
               {data && (
                 <>
+                  {/* Smart collaboration suggestions */}
+                  {data.insights.some((i) => i.taskIds?.length && /stagnat|block|overdue|deadline/i.test(i.type + i.title)) && (
+                    <section>
+                      <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                        Collaboration suggestions
+                      </h3>
+                      <div className="space-y-2">
+                        {data.insights
+                          .filter((i) => i.taskIds?.length)
+                          .slice(0, 3)
+                          .map((ins) => {
+                            const taskId = ins.taskIds![0];
+                            const task = board?.columns.flatMap((c) => c.tasks).find((t) => t.id === taskId);
+                            if (!task) return null;
+                            return (
+                              <div key={ins.id} className="glass rounded-xl p-3">
+                                <p className="text-sm text-gray-200">{ins.detail}</p>
+                                <button
+                                  onClick={() => {
+                                    onClose();
+                                    onStartSyncRoom({ id: task.id, title: task.title });
+                                  }}
+                                  className="btn-primary mt-2 w-full py-1.5 text-xs"
+                                >
+                                  <Radio className="h-3.5 w-3.5" /> Start SyncRoom on “{task.title}”
+                                </button>
+                              </div>
+                            );
+                          })
+                          .filter(Boolean)}
+                      </div>
+                    </section>
+                  )}
+
                   {/* Metrics */}
                   <section className="grid grid-cols-2 gap-3">
                     <Metric label="Completion" value={`${Math.round(data.metrics.completionRate * 100)}%`} />
@@ -140,7 +196,7 @@ export function AIPanel({
                               style={{
                                 width: `${Math.max(4, w.loadScore * 100)}%`,
                                 backgroundColor:
-                                  w.loadScore >= 0.9 ? "#f87171" : w.loadScore >= 0.7 ? "#fbbf24" : "#818cf8",
+                                  w.loadScore >= 0.9 ? "#f87171" : w.loadScore >= 0.7 ? "#fbbf24" : "#4fbfa8",
                               }}
                             />
                           </div>
@@ -188,15 +244,74 @@ export function AIPanel({
                       <div className="space-y-2">
                         {data.insights.map((ins) => {
                           const S = SEVERITY[ins.severity];
+                          const task = ins.taskIds?.[0] ? taskById(ins.taskIds[0]) : undefined;
                           return (
                             <div key={ins.id} className="glass rounded-xl p-3">
                               <div className="flex items-start gap-2">
                                 <S.icon className={`mt-0.5 h-4 w-4 shrink-0 ${S.color}`} />
-                                <div>
+                                <div className="min-w-0 flex-1">
                                   <p className="text-sm font-medium text-gray-100">{ins.title}</p>
                                   <p className="text-xs text-gray-400">{ins.detail}</p>
                                   {ins.recommendation && (
                                     <p className="mt-1 text-[11px] text-brand-300">→ {ins.recommendation}</p>
+                                  )}
+                                  {(ins.type === "alignment" || ins.type === "requirements") &&
+                                    onOpenAlignment && (
+                                      <button
+                                        type="button"
+                                        onClick={onOpenAlignment}
+                                        className="btn-primary mt-2 py-1 text-[10px]"
+                                      >
+                                        Open alignment
+                                      </button>
+                                    )}
+                                  {(ins.type === "alignment" || ins.type === "requirements") &&
+                                    !onOpenAlignment && (
+                                      <p className="mt-2 text-[10px] text-gray-500">
+                                        Use the AI review check bar on the board — it updates
+                                        automatically.
+                                      </p>
+                                    )}
+                                  {task && board && ins.type !== "alignment" && ins.type !== "requirements" && (
+                                    <InsightActions
+                                      insight={ins}
+                                      task={task}
+                                      columns={board.columns}
+                                      onStartSyncRoom={() => {
+                                        onClose();
+                                        onStartSyncRoom({ id: task.id, title: task.title });
+                                      }}
+                                      onMoveToReview={() =>
+                                        runInsightAction(`Moved “${task.title}” to Review`, async () => {
+                                          const col = findColumnByName(board.columns, /review/i);
+                                          if (!col) throw new Error("No Review column");
+                                          await moveTask(task.id, col.id, col.tasks.length);
+                                        })
+                                      }
+                                      onExtendDue={() =>
+                                        runInsightAction("Due date extended by 3 days", async () => {
+                                          const base = task.dueDate ? new Date(task.dueDate) : new Date();
+                                          base.setDate(base.getDate() + 3);
+                                          await updateTask(task.id, { dueDate: base.toISOString() });
+                                        })
+                                      }
+                                      onSetUrgent={() =>
+                                        runInsightAction("Priority set to urgent", () =>
+                                          updateTask(task.id, { priority: "urgent" as Priority }),
+                                        )
+                                      }
+                                      onMoveToBacklog={() =>
+                                        runInsightAction(`Moved “${task.title}” to intake`, async () => {
+                                          const col =
+                                            findColumnByName(
+                                              board.columns,
+                                              /backlog|ideas|pipeline|intake|requests|exploration|submitted|to do|todo/i,
+                                            ) ?? board.columns[0];
+                                          if (!col) throw new Error("No intake column");
+                                          await moveTask(task.id, col.id, 0);
+                                        })
+                                      }
+                                    />
                                   )}
                                 </div>
                               </div>
@@ -231,6 +346,61 @@ function Metric({ label, value, danger }: { label: string; value: string | numbe
       <p className={`mt-0.5 text-2xl font-bold tabular-nums ${danger ? "text-red-300" : "text-gray-50"}`}>
         {value}
       </p>
+    </div>
+  );
+}
+
+function InsightActions({
+  insight,
+  task,
+  columns,
+  onStartSyncRoom,
+  onMoveToReview,
+  onExtendDue,
+  onSetUrgent,
+  onMoveToBacklog,
+}: {
+  insight: Insight;
+  task: Task;
+  columns: import("@/lib/types").Column[];
+  onStartSyncRoom: () => void;
+  onMoveToReview: () => void;
+  onExtendDue: () => void;
+  onSetUrgent: () => void;
+  onMoveToBacklog: () => void;
+}) {
+  const hasReview = columns.some((c) => /review|qa|inspection/i.test(c.name));
+  const hasIntake = columns.some((c) =>
+    /backlog|ideas|pipeline|intake|requests|exploration|submitted|to do|todo/i.test(c.name),
+  );
+
+  return (
+    <div className="mt-2 flex flex-wrap gap-1.5">
+      {(insight.type === "stagnation" || insight.type === "deadline_risk") && (
+        <button onClick={onStartSyncRoom} className="btn-primary py-1 text-[10px]">
+          <Radio className="h-3 w-3" /> SyncRoom
+        </button>
+      )}
+      {insight.type === "stagnation" && hasReview && (
+        <button onClick={onMoveToReview} className="btn-ghost py-1 text-[10px]">
+          Move to Review
+        </button>
+      )}
+      {insight.type === "stagnation" && (
+        <button onClick={onExtendDue} className="btn-ghost py-1 text-[10px]">
+          +3 days
+        </button>
+      )}
+      {insight.type === "deadline_risk" && (
+        <button onClick={onSetUrgent} className="btn-ghost py-1 text-[10px]">
+          Mark urgent
+        </button>
+      )}
+      {insight.type === "wip_limit" && hasIntake && (
+        <button onClick={onMoveToBacklog} className="btn-ghost py-1 text-[10px]">
+          Move “{task.title.slice(0, 20)}…” to intake
+        </button>
+      )}
     </div>
   );
 }

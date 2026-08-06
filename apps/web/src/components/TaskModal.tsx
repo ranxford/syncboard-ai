@@ -2,15 +2,19 @@
 
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Send, Trash2, X } from "lucide-react";
+import { Send, Trash2, Video, X, Radio } from "lucide-react";
+import { CommentBody } from "@/components/CommentBody";
 import { getSocket } from "@/lib/socket";
 import { api } from "@/lib/api";
 import { useBoard } from "@/store/board";
 import { useAuth } from "@/store/auth";
 import { useEscape } from "@/lib/useEscape";
 import { relativeTime } from "@/lib/ui";
-import type { Comment, Member, Priority, Task } from "@/lib/types";
+import type { Comment, Member, Priority, SyncRoomSessionSummary, Task } from "@/lib/types";
+import { suggestedLabelsForField } from "@/lib/projectFields";
 import { Avatar } from "./Avatar";
+import { SyncRoomPresencePrompt } from "./syncroom/SyncRoomPresencePrompt";
+import { useSyncRoom } from "@/store/call";
 
 const PRIORITIES: Priority[] = ["low", "medium", "high", "urgent"];
 
@@ -34,9 +38,10 @@ export function TaskModal({
   members: Member[];
   onClose: () => void;
 }) {
-  const { createTask, updateTask, deleteTask } = useBoard();
+  const { createTask, updateTask, deleteTask, board } = useBoard();
   const currentUser = useAuth((s) => s.user);
   const isEdit = !!task;
+  const fieldSuggestions = suggestedLabelsForField(board?.project.field);
 
   const [title, setTitle] = useState(task?.title ?? "");
   const [description, setDescription] = useState(task?.description ?? "");
@@ -50,15 +55,17 @@ export function TaskModal({
 
   const [comments, setComments] = useState<Comment[]>([]);
   const [commentBody, setCommentBody] = useState("");
+  const [sessions, setSessions] = useState<SyncRoomSessionSummary[]>([]);
 
   useEscape(onClose);
 
   useEffect(() => {
     if (!task) return;
     const socket = getSocket();
-    socket.emit("task:focus", task.id);
+    socket.emit("task:focus", { taskId: task.id, taskTitle: task.title });
 
     api.getComments(task.id).then(({ comments }) => setComments(comments)).catch(() => {});
+    api.getTaskSyncRoomSessions(task.id).then(({ sessions }) => setSessions(sessions)).catch(() => {});
 
     const onAdded = (p: { taskId: string; comment: Comment }) => {
       if (p.taskId === task.id) setComments((c) => (c.some((x) => x.id === p.comment.id) ? c : [...c, p.comment]));
@@ -159,6 +166,63 @@ export function TaskModal({
           </button>
         </div>
 
+        {isEdit && task && (
+          <>
+            <SyncRoomPresencePrompt taskId={task.id} taskTitle={task.title} />
+            <button
+              type="button"
+              onClick={() => {
+                onClose();
+                void useSyncRoom.getState().openLobby({ task: { id: task.id, title: task.title } });
+              }}
+              className="btn-ghost mb-4 w-full border-brand-500/30 text-brand-200"
+            >
+              <Video className="h-4 w-4" /> Live discussion (SyncRoom)
+            </button>
+
+            {sessions.length > 0 && (
+              <div className="mb-4 rounded-xl border border-brand-500/20 bg-brand-500/5 p-3">
+                <h3 className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-brand-300">
+                  <Radio className="h-3.5 w-3.5" /> Past SyncRoom discussions
+                </h3>
+                <ul className="space-y-2">
+                  {sessions.slice(0, 3).map((s) => (
+                    <li key={s.id} className="text-xs text-gray-300">
+                      <span className="text-gray-500">{relativeTime(s.startedAt)}</span>
+                      {s.summary ? (
+                        <p className="mt-0.5 line-clamp-2 text-gray-200">{s.summary}</p>
+                      ) : (
+                        <p className="mt-0.5 text-gray-500">{s.eventCount} events recorded</p>
+                      )}
+                      {s.appliedAt && (
+                        <span className="mt-1 inline-block rounded bg-emerald-500/15 px-1.5 py-0.5 text-[10px] text-emerald-300">
+                          Outcomes applied
+                        </span>
+                      )}
+                      {s.artifacts && s.artifacts.length > 0 && (
+                        <ul className="mt-1 space-y-0.5">
+                          {s.artifacts.map((a) => (
+                            <li key={a.id}>
+                              <a
+                                href={a.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-brand-300 hover:underline"
+                              >
+                                {a.label}
+                              </a>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </>
+        )}
+
         <form onSubmit={save} className="space-y-4">
           <div>
             <label className="mb-1 block text-xs font-medium text-gray-400">Title</label>
@@ -247,13 +311,13 @@ export function TaskModal({
                 {labels.map((label) => (
                   <span
                     key={label}
-                    className="inline-flex items-center gap-1 rounded-full bg-brand-500/15 px-2 py-0.5 text-xs text-brand-300"
+                    className="inline-flex items-center gap-1 rounded-full bg-white/10 px-2 py-0.5 text-xs text-gray-300"
                   >
                     {label}
                     <button
                       type="button"
                       onClick={() => setLabels(labels.filter((l) => l !== label))}
-                      className="text-brand-300/70 hover:text-white"
+                      className="text-gray-400 hover:text-white"
                     >
                       <X className="h-3 w-3" />
                     </button>
@@ -273,6 +337,22 @@ export function TaskModal({
                 }
               }}
             />
+            {fieldSuggestions.length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {fieldSuggestions
+                  .filter((s) => !labels.includes(s))
+                  .map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => setLabels([...labels, s])}
+                      className="rounded-full border border-dashed border-white/15 px-2 py-0.5 text-[11px] text-gray-400 hover:border-brand-500/40 hover:text-brand-200"
+                    >
+                      + {s}
+                    </button>
+                  ))}
+              </div>
+            )}
           </div>
 
           <div className="flex items-center justify-between pt-2">
@@ -327,7 +407,9 @@ export function TaskModal({
                         </button>
                       )}
                     </div>
-                    <p className="whitespace-pre-wrap break-words text-sm text-gray-300">{c.body}</p>
+                    <div className="text-sm text-gray-300">
+                      <CommentBody body={c.body} />
+                    </div>
                   </div>
                 </div>
               ))}

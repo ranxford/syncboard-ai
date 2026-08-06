@@ -1,7 +1,7 @@
 import { prisma } from "../prisma.js";
 
 export function columnIsDone(name: string, order: number, maxOrder: number, total: number): boolean {
-  if (/done|complete|shipped|closed|resolved/i.test(name)) return true;
+  if (/done|complete|shipped|closed|resolved|handover|delivered/i.test(name)) return true;
   return total > 1 && order === maxOrder;
 }
 
