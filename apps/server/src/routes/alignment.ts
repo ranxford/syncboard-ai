@@ -113,7 +113,7 @@ alignmentRouter.put("/projects/:projectId/member-requirements", async (req: Auth
       assignedRequirements: a.assignedRequirements,
     });
     await prisma.membership.update({
-      where: { projectId_userId: { projectId, userId: a.userId } },
+      where: { userId_projectId: { userId: a.userId, projectId } },
       data: {
         positionKey: resolved.positionKey,
         positionLabel: resolved.positionLabel,
