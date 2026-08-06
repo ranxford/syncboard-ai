@@ -11,20 +11,32 @@ teams coordinated, even in low-connectivity environments.
 
 ## 📸 Screenshots
 
-### Landing
-A modern marketing page with a live board preview, feature highlights, and clear calls to action.
+Screenshots are captured from the current UI. Regenerate after UI changes with
+`node scripts/capture-screenshots.mjs` (requires the dev server on port 3000).
 
-![SyncBoard AI+ landing page](./docs/screenshots/landing.png)
+> **Note:** The full codebase (SyncRoom, review workflow, alignment, landing UI)
+> is on the [`cursor/board-video-meetings`](https://github.com/ranxford/syncboard-ai/tree/cursor/board-video-meetings)
+> branch until merged into `main`.
+
+### Landing
+Marketing page with a live board preview, field tags, and a getting-started guide.
+
+![SyncBoard landing page](./docs/screenshots/landing.png)
+
+### Dashboard
+Project list, assigned tasks, teammate awareness, and live SyncRoom indicators.
+
+![SyncBoard dashboard](./docs/screenshots/dashboard.png)
 
 ### Real-time Kanban board
-Drag-and-drop columns with priorities, labels, estimates, assignees, live presence, and WIP awareness.
+Drag-and-drop columns with priorities, labels, timelines, SyncRoom, and review tools.
 
-![SyncBoard AI+ Kanban board](./docs/screenshots/board.png)
+![SyncBoard Kanban board](./docs/screenshots/board.png)
 
 ### AI Insights
 Workload balancing, rebalancing suggestions, and predictive risk detection — derived live from board state.
 
-![SyncBoard AI+ AI Insights panel](./docs/screenshots/ai-insights.png)
+![SyncBoard AI Insights panel](./docs/screenshots/ai-insights.png)
 
 ---
 
@@ -118,22 +130,27 @@ produce predictions, workload analysis, and meeting summaries.
 ```
 syncboard-ai/
 ├─ apps/
-│  ├─ server/            # Express + Socket.io + Prisma API
-│  │  ├─ prisma/         # schema.prisma + seed
+│  ├─ server/                 # Express + Socket.io + Prisma API
+│  │  ├─ prisma/              # schema.prisma + seed
 │  │  └─ src/
-│  │     ├─ ai/          # heuristic + OpenAI providers (predictions, summaries)
-│  │     ├─ routes/      # auth, projects, tasks, analytics, ai, syncroom, dashboard
-│  │     ├─ realtime/    # socket.io, presence, calls, awareness, teammate notify
-│  │     ├─ lib/         # jwt, access control, board state
+│  │     ├─ ai/               # alignment, codeReview, reviewBrief, heuristic, openai
+│  │     ├─ routes/           # auth, projects, tasks, analytics, ai, alignment,
+│  │     │                    # submissions, reviewSources, syncroom, dashboard, ideas, milestones
+│  │     ├─ realtime/         # socket.io, presence, calls, awareness, teammateNotify
+│  │     ├─ lib/              # access, board, columns, projectFields, reviewStorage,
+│  │     │                    # submissionReadiness, timelines, teammates, codeExtract
 │  │     └─ index.ts
-│  └─ web/               # Next.js app
+│  └─ web/                    # Next.js app
 │     └─ src/
-│        ├─ app/         # landing, login, dashboard, board/[id]
-│        ├─ components/  # KanbanBoard, AIPanel, SyncRoom, PresenceBar, TeammateLiveFeed…
-│        ├─ store/       # zustand auth + board + call stores (optimistic + offline)
-│        └─ lib/         # api client, socket client, offline queue
-├─ docker-compose.yml    # optional Postgres + Redis
-└─ package.json          # npm workspaces + scripts
+│        ├─ app/              # landing, login, signup, dashboard, board/[id]
+│        ├─ components/       # KanbanBoard, AIPanel, CallPanel, ReviewDeliverablesPanel,
+│        │                    # ProjectAlignmentPanel, TeamPanel, landing/, syncroom/, call/
+│        ├─ store/            # auth, board, call (optimistic + offline)
+│        └─ lib/              # api, socket, webrtc, syncRoom, projectFields, types
+├─ docs/                      # ARCHITECTURE, COLLABORATION, DEMO, ROADMAP, screenshots/
+├─ scripts/                   # capture-screenshots.mjs
+├─ docker-compose.yml         # optional Postgres + Redis
+└─ package.json               # npm workspaces + scripts
 ```
 
 ---
@@ -328,6 +345,7 @@ See [docs/ROADMAP.md](./docs/ROADMAP.md) for future work (screen recording in re
 | `npm run db:seed` | Re-seed demo data |
 | `npm run db:studio` | Open Prisma Studio |
 | `npm test` | Run the full server test suite (AI engine + label units + HTTP integration) |
+| `node scripts/capture-screenshots.mjs` | Refresh README screenshots (dev server must be running) |
 
 CI runs install → Prisma generate → lint → build → tests on every push/PR (see
 [`.github/workflows/ci.yml`](./.github/workflows/ci.yml)). The test suite includes
