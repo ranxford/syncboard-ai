@@ -21,22 +21,22 @@ Screenshots are captured from the current UI. Regenerate after UI changes with
 ### Landing
 Marketing page with a live board preview, field tags, and a getting-started guide.
 
-![SyncBoard landing page](./docs/screenshots/landing.png)
+![SyncBoard landing page](./docs/screenshots/01-landing.png)
 
 ### Dashboard
 Project list, assigned tasks, teammate awareness, and live SyncRoom indicators.
 
-![SyncBoard dashboard](./docs/screenshots/dashboard.png)
+![SyncBoard dashboard](./docs/screenshots/02-dashboard.png)
 
 ### Real-time Kanban board
 Drag-and-drop columns with priorities, labels, timelines, SyncRoom, and review tools.
 
-![SyncBoard Kanban board](./docs/screenshots/board.png)
+![SyncBoard Kanban board](./docs/screenshots/03-board.png)
 
 ### AI Insights
 Workload balancing, rebalancing suggestions, and predictive risk detection — derived live from board state.
 
-![SyncBoard AI Insights panel](./docs/screenshots/ai-insights.png)
+![SyncBoard AI Insights panel](./docs/screenshots/04-ai-insights.png)
 
 ---
 

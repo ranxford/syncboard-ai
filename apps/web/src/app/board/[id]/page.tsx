@@ -150,6 +150,10 @@ function BoardInner({ projectId }: { projectId: string }) {
   }, [searchParams, board, editing]);
 
   useEffect(() => {
+    if (searchParams.get("insights") === "1") setAiOpen(true);
+  }, [searchParams]);
+
+  useEffect(() => {
     if (!board || board.project.visibility !== "shared" || !isProjectAdmin) {
       setAlignEffectiveness(null);
       setMyAlignStatus(null);
