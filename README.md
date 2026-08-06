@@ -66,6 +66,7 @@ Workload balancing, rebalancing suggestions, and predictive risk detection — d
 
 | Doc | Purpose |
 | --- | --- |
+| [LOCAL_SETUP.md](./docs/LOCAL_SETUP.md) | **Team onboarding** — clone, setup, demo accounts, feature checklist |
 | [COLLABORATION.md](./docs/COLLABORATION.md) | Who sees what — projects, presence, teammate awareness |
 | [ARCHITECTURE.md](./docs/ARCHITECTURE.md) | System design, realtime channels, data model |
 | [DEMO.md](./docs/DEMO.md) | 5–8 minute supervisor / presentation script |
@@ -157,6 +158,9 @@ syncboard-ai/
 
 ## 🚀 Getting started
 
+> **Team onboarding:** share [docs/LOCAL_SETUP.md](./docs/LOCAL_SETUP.md) with colleagues —
+> clone, `npm run setup`, `npm run dev`, and sign in with the demo accounts below.
+
 ### Prerequisites
 - **Node.js ≥ 18.18** (v20 LTS recommended) and npm
 
@@ -165,13 +169,16 @@ syncboard-ai/
 ### 1. Install & set up (one command)
 
 ```bash
+git clone https://github.com/ranxford/syncboard-ai.git
+cd syncboard-ai
 npm run setup
 ```
 
-This installs dependencies, generates the Prisma client, creates the local
-SQLite database, and seeds demo data. **AI uses heuristic mode** — no OpenAI key.
+This installs dependencies, creates local env files from examples, generates the
+Prisma client, creates the SQLite database, and seeds demo data. **AI uses
+heuristic mode** — no OpenAI key.
 
-> Equivalent to: `npm install && npm run db:setup && npm run db:seed`
+> Equivalent to: `npm install && node scripts/bootstrap-env.mjs && npm run db:setup && npm run db:seed`
 
 ### 2. Run the app
 
@@ -198,8 +205,10 @@ an overloaded teammate). Open **AI Insights** to see them.
 
 ## 🔌 Environment variables
 
-Local `.env` files are created for you (`apps/server/.env`, `apps/web/.env.local`).
-See [`.env.example`](./.env.example) for the full reference.
+Local env files are created on first `npm run setup` from
+[`apps/server/.env.example`](./apps/server/.env.example) and
+[`apps/web/.env.local.example`](./apps/web/.env.local.example).
+See [`.env.example`](./.env.example) for a combined reference.
 
 Key options:
 
