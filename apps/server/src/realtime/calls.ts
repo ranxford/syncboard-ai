@@ -26,6 +26,20 @@ class CallManager {
   private rooms = new Map<string, Map<string, CallParticipant>>();
   // socketId -> projectId (reverse index for fast leave / signal validation)
   private socketProject = new Map<string, string>();
+  // Active persisted SyncRoom session per project (while anyone is in-call)
+  private activeSessions = new Map<string, string>();
+
+  activeSession(projectId: string): string | null {
+    return this.activeSessions.get(projectId) ?? null;
+  }
+
+  setActiveSession(projectId: string, sessionId: string): void {
+    this.activeSessions.set(projectId, sessionId);
+  }
+
+  clearActiveSession(projectId: string): void {
+    this.activeSessions.delete(projectId);
+  }
 
   join(projectId: string, p: CallParticipant): void {
     if (!this.rooms.has(projectId)) this.rooms.set(projectId, new Map());
@@ -41,7 +55,10 @@ class CallManager {
     const members = this.rooms.get(projectId);
     if (members) {
       members.delete(socketId);
-      if (members.size === 0) this.rooms.delete(projectId);
+      if (members.size === 0) {
+        this.rooms.delete(projectId);
+        this.activeSessions.delete(projectId);
+      }
     }
     return projectId;
   }

@@ -8,6 +8,7 @@
   ],
   "scripts": {
     "dev": "concurrently -n server,web -c blue,magenta \"npm:dev:server\" \"npm:dev:web\"",
+    "dev:clean": "lsof -ti tcp:3000,tcp:4000 | xargs kill -9 2>/dev/null || true && rm -rf apps/web/.next && npm run dev",
     "dev:server": "npm run dev --workspace apps/server",
     "dev:web": "npm run dev --workspace apps/web",
     "build": "npm run build --workspace apps/server && npm run build --workspace apps/web",

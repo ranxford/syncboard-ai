@@ -1,4 +1,5 @@
 import { getIceServers } from "./config";
+import { cameraTrackFromStream, isScreenShareTrack } from "./trackUtils";
 import type { CallPeerInfo, SignalMessage } from "./types";
 
 type SendSignal = (toSocketId: string, message: SignalMessage) => void;
@@ -11,6 +12,7 @@ export class PeerMesh {
   private connections = new Map<string, RTCPeerConnection>();
   private peerInfo = new Map<string, CallPeerInfo>();
   private localStream: MediaStream | null = null;
+  /** Camera track to restore after screen share — never the screen track. */
   private cameraVideoTrack: MediaStreamTrack | null = null;
 
   constructor(
@@ -21,10 +23,17 @@ export class PeerMesh {
 
   setLocalStream(stream: MediaStream | null) {
     this.localStream = stream;
-    this.cameraVideoTrack = stream?.getVideoTracks()[0] ?? null;
+    const cam = cameraTrackFromStream(stream);
+    if (cam) this.cameraVideoTrack = cam;
     for (const pc of this.connections.values()) {
-      this.syncLocalTracks(pc);
+      void this.syncLocalTracks(pc);
     }
+  }
+
+  /** Keep camera restore target in sync when swapping to/from screen share. */
+  setCameraVideoTrack(track: MediaStreamTrack | null) {
+    if (track && isScreenShareTrack(track)) return;
+    this.cameraVideoTrack = track;
   }
 
   rememberPeer(info: CallPeerInfo) {
@@ -43,12 +52,25 @@ export class PeerMesh {
     const pc = this.getOrCreateConnection(from);
 
     if ("sdp" in message && message.sdp) {
-      await pc.setRemoteDescription(new RTCSessionDescription(message.sdp));
-      if (message.sdp.type === "offer") {
+      const desc = new RTCSessionDescription(message.sdp);
+
+      if (desc.type === "offer") {
+        if (pc.signalingState === "have-local-offer") {
+          await pc.setLocalDescription({ type: "rollback" } as RTCSessionDescriptionInit);
+        }
+        await pc.setRemoteDescription(desc);
         const answer = await pc.createAnswer();
         await pc.setLocalDescription(answer);
         this.sendSignal(from, { sdp: pc.localDescription!.toJSON() });
+        return;
       }
+
+      if (desc.type === "answer" && pc.signalingState === "have-local-offer") {
+        await pc.setRemoteDescription(desc);
+        return;
+      }
+
+      await pc.setRemoteDescription(desc);
       return;
     }
 
@@ -66,9 +88,12 @@ export class PeerMesh {
   }
 
   async stopScreenShare() {
-    if (this.cameraVideoTrack) {
-      await this.replaceOutgoingVideo(this.cameraVideoTrack);
-    }
+    await this.replaceOutgoingVideo(this.cameraVideoTrack);
+  }
+
+  /** Stop sending video entirely (audio-only after screen share). */
+  async clearOutgoingVideo() {
+    await this.replaceOutgoingVideo(null);
   }
 
   dropPeer(socketId: string) {
@@ -94,7 +119,7 @@ export class PeerMesh {
 
     const pc = new RTCPeerConnection(getIceServers());
     this.connections.set(socketId, pc);
-    this.syncLocalTracks(pc);
+    void this.syncLocalTracks(pc);
 
     pc.onicecandidate = (event) => {
       if (event.candidate) {
@@ -118,19 +143,47 @@ export class PeerMesh {
     return pc;
   }
 
-  private syncLocalTracks(pc: RTCPeerConnection) {
+  private async syncLocalTracks(pc: RTCPeerConnection) {
     if (!this.localStream) return;
     for (const track of this.localStream.getTracks()) {
       const sender = pc.getSenders().find((s) => s.track?.kind === track.kind);
-      if (sender) void sender.replaceTrack(track);
-      else pc.addTrack(track, this.localStream);
+      if (sender) {
+        await sender.replaceTrack(track);
+      } else {
+        pc.addTrack(track, this.localStream);
+      }
     }
   }
 
-  private async replaceOutgoingVideo(track: MediaStreamTrack) {
-    for (const pc of this.connections.values()) {
-      const sender = pc.getSenders().find((s) => s.track?.kind === "video");
-      if (sender) await sender.replaceTrack(track);
+  private getVideoSender(pc: RTCPeerConnection): RTCRtpSender | undefined {
+    return pc.getSenders().find((s) => s.track?.kind === "video");
+  }
+
+  private async replaceOutgoingVideo(track: MediaStreamTrack | null) {
+    for (const [socketId, pc] of this.connections) {
+      const sender = this.getVideoSender(pc);
+
+      if (sender) {
+        await sender.replaceTrack(track);
+        await this.renegotiate(socketId, pc);
+        continue;
+      }
+
+      if (track && this.localStream) {
+        pc.addTrack(track, this.localStream);
+        await this.renegotiate(socketId, pc);
+      }
+    }
+  }
+
+  private async renegotiate(socketId: string, pc: RTCPeerConnection) {
+    if (pc.signalingState !== "stable") return;
+    try {
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      this.sendSignal(socketId, { sdp: pc.localDescription!.toJSON() });
+    } catch {
+      /* peer may have disconnected */
     }
   }
 

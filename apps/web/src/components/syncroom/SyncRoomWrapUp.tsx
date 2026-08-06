@@ -2,28 +2,55 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Brain, Clock, Sparkles, X } from "lucide-react";
+import { Brain, Clock, LayoutList, Sparkles, X } from "lucide-react";
 import { api } from "@/lib/api";
-import type { MeetingResult } from "@/lib/types";
+import type { Column, Member, MeetingResult } from "@/lib/types";
 import { relativeTime } from "@/lib/ui";
+import {
+  actionItemsForImport,
+  defaultActionColumn,
+  formatOutcomeComment,
+} from "@/lib/syncRoom/applyOutcomes";
 import type { SessionEvent, TaskContext } from "@/lib/syncRoom/sessionLog";
+import { useBoard } from "@/store/board";
 import { useSyncRoom } from "@/store/call";
 import { toast } from "@/store/toast";
+
+function eventIcon(kind: SessionEvent["kind"]): string {
+  if (kind.startsWith("task_")) return "📋";
+  if (kind === "outcomes_applied") return "✨";
+  if (kind === "screen_shared") return "🖥";
+  if (kind === "peer_joined" || kind === "peer_left") return "👤";
+  return "•";
+}
 
 export function SyncRoomWrapUp({
   open,
   sessionLog,
   contextTask,
+  projectId,
+  columns,
+  members,
   onClose,
 }: {
   open: boolean;
   sessionLog: SessionEvent[];
   contextTask: TaskContext | null;
+  projectId: string;
+  columns: Column[];
+  members: Member[];
   onClose: () => void;
 }) {
+  const applyServerBoard = useBoard((s) => s.applyServerBoard);
+  const board = useBoard((s) => s.board);
+  const sessionId = useSyncRoom((s) => s.sessionId);
+  const collaborativeNotes = useSyncRoom((s) => s.collaborativeNotes);
+  const whiteboardStrokes = useSyncRoom((s) => s.whiteboardStrokes);
   const [notes, setNotes] = useState("");
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<MeetingResult | null>(null);
+
+  const boardEvents = sessionLog.filter((e) => e.kind.startsWith("task_")).length;
 
   if (!open) return null;
 
@@ -35,6 +62,7 @@ export function SyncRoomWrapUp({
       ...sessionLog.map((e) => `- ${e.label}`),
       "",
       notes.trim() ? `Facilitator notes:\n${notes.trim()}` : "",
+      collaborativeNotes.trim() ? `Live session notes:\n${collaborativeNotes.trim()}` : "",
     ]
       .filter(Boolean)
       .join("\n");
@@ -50,27 +78,72 @@ export function SyncRoomWrapUp({
     }
   }
 
-  async function attachToTask() {
-    if (!contextTask || !result) return;
-    const body = [
-      "## SyncRoom summary",
-      result.summary,
-      "",
-      result.decisions.length ? `**Decisions:**\n${result.decisions.map((d) => `- ${d}`).join("\n")}` : "",
-      result.actionItems.length
-        ? `**Action items:**\n${result.actionItems.map((a) => `- ${a.title}`).join("\n")}`
-        : "",
-    ]
-      .filter(Boolean)
-      .join("\n");
-
+  async function saveSessionOnly() {
+    if (!sessionId) {
+      onClose();
+      return;
+    }
     setBusy(true);
     try {
-      await api.addComment(contextTask.id, body);
-      toast.success("Summary attached to the task.");
+      await api.finalizeSyncRoomSession(sessionId, {
+        notes: collaborativeNotes || notes,
+        summary: result?.summary,
+        decisions: result?.decisions,
+        whiteboard: JSON.stringify(whiteboardStrokes),
+      });
       onClose();
     } catch {
-      toast.error("Couldn't attach the summary.");
+      toast.error("Couldn't save the session.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function applyToBoard() {
+    if (!result) return;
+    setBusy(true);
+    try {
+      const items = actionItemsForImport(
+        result,
+        members,
+        board?.columns.flatMap((c) => c.tasks).map((t) => t.title) ?? [],
+      );
+      let created = 0;
+
+      if (items.length > 0) {
+        const columnId = defaultActionColumn(columns);
+        const { board } = await api.importTasks(projectId, columnId, items);
+        applyServerBoard(board);
+        created = items.length;
+      }
+
+      if (contextTask) {
+        await api.addComment(contextTask.id, formatOutcomeComment(result));
+      }
+
+      if (sessionId) {
+        await api.finalizeSyncRoomSession(sessionId, {
+          notes: collaborativeNotes || notes,
+          summary: result.summary,
+          decisions: result.decisions,
+          whiteboard: JSON.stringify(whiteboardStrokes),
+          applied: true,
+        });
+      }
+
+      useSyncRoom.getState().logSession(
+        "outcomes_applied",
+        `Applied ${created} task${created === 1 ? "" : "s"} + summary${contextTask ? ` on “${contextTask.title}”` : ""}`,
+      );
+
+      toast.success(
+        created > 0
+          ? `Board updated — ${created} new task${created === 1 ? "" : "s"} and summary saved.`
+          : "Summary and decisions saved to the task.",
+      );
+      onClose();
+    } catch {
+      toast.error("Couldn't apply outcomes to the board.");
     } finally {
       setBusy(false);
     }
@@ -92,6 +165,12 @@ export function SyncRoomWrapUp({
                 Discussion on <span className="text-gray-200">“{contextTask.title}”</span>
               </p>
             )}
+            {boardEvents > 0 && (
+              <p className="mt-1 flex items-center gap-1 text-xs text-emerald-300/90">
+                <LayoutList className="h-3.5 w-3.5" />
+                {boardEvents} board change{boardEvents === 1 ? "" : "s"} captured during this session
+              </p>
+            )}
           </div>
           <button onClick={onClose} className="rounded-md p-1 text-gray-400 hover:bg-white/10">
             <X className="h-5 w-5" />
@@ -102,9 +181,10 @@ export function SyncRoomWrapUp({
           <h3 className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-gray-500">
             <Clock className="h-3.5 w-3.5" /> Timeline
           </h3>
-          <ul className="space-y-1.5 rounded-xl border border-white/[0.08] bg-white/[0.02] p-3">
+          <ul className="max-h-48 space-y-1.5 overflow-y-auto rounded-xl border border-white/[0.08] bg-white/[0.02] p-3">
             {sessionLog.map((e) => (
               <li key={e.id} className="flex gap-2 text-xs text-gray-300">
+                <span className="shrink-0 w-4 text-center">{eventIcon(e.kind)}</span>
                 <span className="shrink-0 text-gray-500">{relativeTime(e.at)}</span>
                 <span>{e.label}</span>
               </li>
@@ -147,7 +227,7 @@ export function SyncRoomWrapUp({
             )}
             {result.actionItems.length > 0 && (
               <div>
-                <p className="mb-1 text-xs font-semibold text-gray-400">Suggested action items</p>
+                <p className="mb-1 text-xs font-semibold text-gray-400">Action items → board</p>
                 <ul className="space-y-1 text-sm text-gray-300">
                   {result.actionItems.map((a) => (
                     <li key={a.title} className="rounded-lg bg-white/[0.03] px-2 py-1">
@@ -158,16 +238,17 @@ export function SyncRoomWrapUp({
                 </ul>
               </div>
             )}
-            <div className="flex gap-2">
-              {contextTask && (
-                <button onClick={() => void attachToTask()} disabled={busy} className="btn-primary flex-1">
-                  Attach to task
-                </button>
-              )}
-              <button onClick={onClose} className="btn-ghost flex-1">
-                Done
-              </button>
-            </div>
+            <button onClick={() => void applyToBoard()} disabled={busy} className="btn-primary w-full">
+              <LayoutList className="h-4 w-4" />
+              {busy ? "Applying…" : "Apply outcomes to board"}
+            </button>
+            <button
+              onClick={() => void saveSessionOnly()}
+              disabled={busy}
+              className="btn-ghost w-full text-gray-400"
+            >
+              Close without applying
+            </button>
           </div>
         )}
       </motion.div>

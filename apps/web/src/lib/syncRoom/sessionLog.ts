@@ -9,7 +9,12 @@ export type SessionEventKind =
   | "peer_left"
   | "screen_shared"
   | "screen_stopped"
-  | "session_ended";
+  | "session_ended"
+  | "task_created"
+  | "task_updated"
+  | "task_moved"
+  | "task_deleted"
+  | "outcomes_applied";
 
 export interface SessionEvent {
   id: string;

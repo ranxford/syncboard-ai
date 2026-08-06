@@ -33,8 +33,9 @@ Workload balancing, rebalancing suggestions, and predictive risk detection — d
 | Feature | Description |
 | --- | --- |
 | **Real-time sync** | Every task change broadcasts instantly over Socket.io — no refresh needed. |
-| **SyncRoom** | Context-aware live collaboration per project or task — audio/video, screen share, AI session replay, and outcomes attached to work. |
+| **SyncRoom** | Closed-loop live collaboration — sessions log board changes, AI wrap-up, and **apply outcomes** back to tasks. |
 | **Live presence** | See who's online and which task each teammate is editing, in real time. |
+| **Teammate awareness** | Projects stay private to members, but you see what shared teammates are doing across your projects — live on the dashboard. |
 | **AI workflow prediction** | Detects stalled tasks, deadline risk, and WIP-limit breaches before they hurt delivery. |
 | **Smart task rebalancing** | Recommends optimal task reassignment based on live workload analysis. |
 | **AI meeting intelligence** | Summarizes meeting notes and extracts action items into tasks. |
@@ -42,6 +43,21 @@ Workload balancing, rebalancing suggestions, and predictive risk detection — d
 | **Offline resilience** | Edits made while offline are queued locally and synced automatically on reconnect. |
 | **Connectivity meter** | Live latency / online / offline indicator with queued-change count. |
 | **Board zoom** | Zoom in/out on the Kanban canvas (60–150%), fit-all-columns, Ctrl+scroll, and per-project persistence. |
+| **Proactive AI nudges** | Critical board risks surface as toasts while you work — no need to open AI Insights first. |
+| **SyncRoom whiteboard** | Sketch together during a call; strokes sync live and persist with the session. |
+| **Session artifacts** | Save links (docs, Figma, PRs) to a SyncRoom; they appear in task discussion history. |
+| **Review deliverables** | Members attach Figma links/exports and files at submit; admins generate AI review briefs over sources. |
+
+---
+
+## 📚 Documentation
+
+| Doc | Purpose |
+| --- | --- |
+| [COLLABORATION.md](./docs/COLLABORATION.md) | Who sees what — projects, presence, teammate awareness |
+| [ARCHITECTURE.md](./docs/ARCHITECTURE.md) | System design, realtime channels, data model |
+| [DEMO.md](./docs/DEMO.md) | 5–8 minute supervisor / presentation script |
+| [ROADMAP.md](./docs/ROADMAP.md) | Shipped features vs future work |
 
 ---
 
@@ -106,15 +122,15 @@ syncboard-ai/
 │  │  ├─ prisma/         # schema.prisma + seed
 │  │  └─ src/
 │  │     ├─ ai/          # heuristic + OpenAI providers (predictions, summaries)
-│  │     ├─ routes/      # auth, projects, tasks, analytics, ai
-│  │     ├─ realtime/    # socket.io, presence, emitter
+│  │     ├─ routes/      # auth, projects, tasks, analytics, ai, syncroom, dashboard
+│  │     ├─ realtime/    # socket.io, presence, calls, awareness, teammate notify
 │  │     ├─ lib/         # jwt, access control, board state
 │  │     └─ index.ts
 │  └─ web/               # Next.js app
 │     └─ src/
 │        ├─ app/         # landing, login, dashboard, board/[id]
-│        ├─ components/  # KanbanBoard, AIPanel, MeetingModal, PresenceBar…
-│        ├─ store/       # zustand auth + board stores (optimistic + offline)
+│        ├─ components/  # KanbanBoard, AIPanel, SyncRoom, PresenceBar, TeammateLiveFeed…
+│        ├─ store/       # zustand auth + board + call stores (optimistic + offline)
 │        └─ lib/         # api client, socket client, offline queue
 ├─ docker-compose.yml    # optional Postgres + Redis
 └─ package.json          # npm workspaces + scripts
@@ -136,7 +152,7 @@ npm run setup
 ```
 
 This installs dependencies, generates the Prisma client, creates the local
-SQLite database, and seeds demo data.
+SQLite database, and seeds demo data. **AI uses heuristic mode** — no OpenAI key.
 
 > Equivalent to: `npm install && npm run db:setup && npm run db:seed`
 
@@ -175,16 +191,19 @@ Key options:
 - `DATABASE_URL` — SQLite by default; switch to Postgres for production
 - `REDIS_URL` — optional; enables Redis (in-memory fallback otherwise)
 
-### Enabling OpenAI
+### Enabling OpenAI (optional — not needed for demos or git)
+
+Default is **`AI_PROVIDER=heuristic`** in `.env.example`. Board analytics, alignment,
+submit gate, and automatic member feedback all work without any API key.
 
 ```env
-# apps/server/.env
-AI_PROVIDER=openai
-OPENAI_API_KEY=sk-...
+# Only on your machine, never commit:
+# AI_PROVIDER=openai
+# OPENAI_API_KEY=sk-...
 ```
 
-Board predictions stay deterministic/explainable; OpenAI powers meeting
-summarization and action-item extraction.
+Board predictions and alignment scoring stay deterministic; OpenAI only changes
+wording for meeting summaries and optional richer alignment prose.
 
 ---
 
@@ -258,28 +277,36 @@ sections in `render.yaml` and `docker-compose.yml`.
 
 ---
 
-## 📹 SyncRoom — context-aware collaboration
+## 📹 SyncRoom — closed-loop collaboration intelligence
 
 SyncBoard AI+ does **not** ship a generic Zoom clone. Every board has a **SyncRoom** —
-a live workspace that exists *because of the project*, not as a separate conferencing app.
+a live workspace tied to project work. Sessions don't end when you hang up — they **update the board**.
 
 ### How it differs from video chat
 
 | Zoom-style meeting | SyncRoom |
 | --- | --- |
-| Scheduled call | Opens from the project or a specific task |
-| Ends when you hang up | **Session replay** timeline + optional AI wrap-up |
-| Notes live elsewhere | Summary, decisions, and action items attach to the task |
+| Scheduled call | Opens from a **task** (best) or the project toolbar |
+| Ends when you hang up | **Session replay** timeline + AI wrap-up → **Apply outcomes to board** |
+| Notes live elsewhere | Summary on the task; action items imported to Backlog |
 | Generic “participants” | Presence prompts: “Mary is on this task — start SyncRoom?” |
 
 ### What you can do today
 
-1. **Project SyncRoom** — open from the board toolbar; collaborate while moving cards and editing work.
-2. **Task live discussion** — every task has a “Live discussion (SyncRoom)” button.
+1. **Task live discussion** — every task has a “Live discussion (SyncRoom)” button (recommended entry).
+2. **Project SyncRoom** — board toolbar; card moves and edits are logged to the session replay while live.
 3. **Presence suggestions** — when teammates focus the same task, SyncRoom is one click away.
 4. **AI collaboration suggestions** — stalled/blocked tasks in AI Insights recommend starting a SyncRoom.
-5. **Session replay** — on leave, a timeline shows who joined, screen shares, and session flow.
-6. **AI wrap-up** — generate summary, decisions, and action items; attach them as a task comment.
+5. **Session replay** — timeline of joins, screen shares, **and board mutations** during the session (shared across participants, persisted).
+6. **Apply outcomes to board** — AI summary + decisions attached to the task; action items imported to Backlog.
+7. **Live collaborative notes** — shared notes pane during SyncRoom, included in AI wrap-up.
+8. **Collaborative whiteboard** — sketch during calls; strokes sync live and save with the session.
+9. **Session artifacts** — attach links (docs, designs, PRs) during a call; visible in task history.
+10. **Task spotlight** — pinned task card in the call panel when discussing a specific card.
+11. **Task discussion history** — past SyncRoom sessions visible on each task.
+12. **One-click AI actions** — move stalled tasks, extend deadlines, mark urgent, start SyncRoom from AI Insights.
+13. **Proactive AI nudges** — critical risks toast on the board without opening AI Insights.
+14. **Dashboard intelligence** — overdue counts, stalled tasks, live SyncRoom indicators, teammate awareness.
 
 Under the hood: **WebRTC peer mesh** with Socket.io signaling only (media never hits the server).
 Optional `NEXT_PUBLIC_TURN_URL` for strict corporate NAT. Client code lives in
@@ -287,13 +314,7 @@ Optional `NEXT_PUBLIC_TURN_URL` for strict corporate NAT. Client code lives in
 
 > Requires `https` in production (or `localhost` in dev) for camera/mic access.
 
-### Roadmap (not yet built)
-
-- Collaborative whiteboard linked to projects
-- Full session artifact linking (files, card moves in replay)
-- Automatic action-item import into the backlog
-
----
+See [docs/ROADMAP.md](./docs/ROADMAP.md) for future work (screen recording in replay, file uploads, E2E WebRTC tests).
 
 ## 📜 Scripts
 

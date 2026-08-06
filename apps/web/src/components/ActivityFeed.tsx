@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { History } from "lucide-react";
+import { getSocket } from "@/lib/socket";
 import { api } from "@/lib/api";
 import type { Activity } from "@/lib/types";
 import { relativeTime } from "@/lib/ui";
@@ -23,11 +24,26 @@ export function ActivityFeed({ projectId, refreshKey }: { projectId: string; ref
     };
   }, [projectId, refreshKey]);
 
+  useEffect(() => {
+    const socket = getSocket();
+    const onCreated = (payload: { activity: Activity }) => {
+      setActivities((prev) => {
+        if (prev.some((a) => a.id === payload.activity.id)) return prev;
+        return [payload.activity, ...prev].slice(0, 50);
+      });
+    };
+    socket.on("activity:created", onCreated);
+    return () => {
+      socket.off("activity:created", onCreated);
+    };
+  }, [projectId]);
+
   return (
     <div className="flex h-full flex-col">
       <div className="flex items-center gap-2 border-b border-white/10 px-4 py-3">
         <History className="h-4 w-4 text-gray-400" />
         <h3 className="text-sm font-semibold text-gray-200">Activity</h3>
+        <span className="ml-auto h-2 w-2 rounded-full bg-emerald-400" title="Live" />
       </div>
       <div className="flex-1 space-y-3 overflow-y-auto p-4">
         {activities.length === 0 && <p className="text-xs text-gray-500">No activity yet.</p>}

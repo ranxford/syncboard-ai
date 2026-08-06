@@ -1,26 +1,26 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { Users } from "lucide-react";
+import { PhoneOff, Users, X } from "lucide-react";
 import { useCallShortcuts } from "@/lib/webrtc/useCallShortcuts";
 import type { CallViewMode } from "@/lib/webrtc/types";
 import { useAuth } from "@/store/auth";
 import { useSyncRoom } from "@/store/call";
+import { CallDevicePicker } from "./call/CallDevicePicker";
 import { CallControls, CallHeaderControls } from "./call/CallControls";
 import { CallLobby } from "./call/CallLobby";
 import { CallRoom } from "./call/CallRoom";
+import { SyncRoomSessionTools } from "./syncroom/SyncRoomSessionTools";
+import { SyncRoomTaskSpotlight } from "./syncroom/SyncRoomTaskSpotlight";
 
 function panelClass(mode: CallViewMode): string {
   if (mode === "fullscreen") {
-    return "fixed inset-3 z-[90] flex w-auto max-w-none flex-col";
-  }
-  if (mode === "expanded") {
-    return "fixed bottom-4 left-1/2 z-[80] flex w-[min(96vw,56rem)] -translate-x-1/2 flex-col";
+    return "fixed inset-3 z-[90] flex w-auto max-w-none flex-col overflow-hidden rounded-xl border border-white/10 bg-ink-900 shadow-2xl";
   }
   if (mode === "minimized") {
-    return "fixed bottom-4 right-4 z-[80] flex w-[min(92vw,20rem)] flex-col";
+    return "fixed bottom-4 right-4 z-[90] flex w-[min(92vw,18rem)] flex-col overflow-hidden rounded-xl border border-white/10 bg-ink-900 shadow-xl";
   }
-  return "fixed bottom-4 right-4 z-[80] flex w-[min(92vw,28rem)] flex-col";
+  return "flex h-full w-[min(100%,20rem)] shrink-0 flex-col overflow-hidden border-l border-white/10 bg-ink-900 lg:w-[22rem]";
 }
 
 export function SyncRoomPanel() {
@@ -34,23 +34,27 @@ export function SyncRoomPanel() {
   const sharingScreen = useSyncRoom((s) => s.sharingScreen);
   const cameras = useSyncRoom((s) => s.cameras);
   const mics = useSyncRoom((s) => s.mics);
+  const speakers = useSyncRoom((s) => s.speakers);
   const cameraId = useSyncRoom((s) => s.cameraId);
   const micId = useSyncRoom((s) => s.micId);
+  const speakerId = useSyncRoom((s) => s.speakerId);
   const contextTask = useSyncRoom((s) => s.contextTask);
   const user = useAuth((s) => s.user);
 
-  const {
-    closeLobby,
-    join,
-    leave,
-    toggleMic,
-    toggleCam,
-    toggleScreen,
-    setViewMode,
-    copyInviteLink,
-    setCameraId,
-    setMicId,
-  } = useSyncRoom.getState();
+  const closeLobby = useSyncRoom((s) => s.closeLobby);
+  const join = useSyncRoom((s) => s.join);
+  const leave = useSyncRoom((s) => s.leave);
+  const toggleMic = useSyncRoom((s) => s.toggleMic);
+  const toggleCam = useSyncRoom((s) => s.toggleCam);
+  const toggleScreen = useSyncRoom((s) => s.toggleScreen);
+  const setViewMode = useSyncRoom((s) => s.setViewMode);
+  const copyInviteLink = useSyncRoom((s) => s.copyInviteLink);
+  const setCameraId = useSyncRoom((s) => s.setCameraId);
+  const setMicId = useSyncRoom((s) => s.setMicId);
+  const setSpeakerId = useSyncRoom((s) => s.setSpeakerId);
+  const refreshDevices = useSyncRoom((s) => s.refreshDevices);
+  const connectMobileCamera = useSyncRoom((s) => s.useMobileCamera);
+  const connectMobileMic = useSyncRoom((s) => s.useMobileMic);
 
   useCallShortcuts(phase === "in-call");
 
@@ -60,99 +64,150 @@ export function SyncRoomPanel() {
   const connecting = phase === "connecting";
   const inLobby = phase === "lobby";
   const total = participants.length + (inCall ? 1 : 0);
-  const showBody = viewMode !== "minimized";
+  const minimized = viewMode === "minimized";
+  const showBody = !minimized;
+  const docked = viewMode !== "fullscreen" && viewMode !== "minimized";
+
+  function endOrClose() {
+    if (inCall || connecting) leave();
+    else closeLobby();
+  }
+
+  const controlProps = {
+    micOn,
+    camOn,
+    sharingScreen,
+    viewMode,
+    onToggleMic: toggleMic,
+    onToggleCam: toggleCam,
+    onToggleScreen: () => void toggleScreen(),
+    onCopyLink: () => void copyInviteLink(),
+    onViewMode: setViewMode,
+    onUseMobileCamera: () => void connectMobileCamera(),
+    hasMobileCamera: cameras.some((c) => c.isMobileDevice || c.isPhoneCamera),
+  };
+
+  const devicePickerProps = {
+    cameras,
+    mics,
+    speakers,
+    cameraId,
+    micId,
+    speakerId,
+    onCameraChange: (id: string) => void setCameraId(id),
+    onMicChange: (id: string) => void setMicId(id),
+    onSpeakerChange: setSpeakerId,
+    onRefreshDevices: () => void refreshDevices(),
+    onUseMobileCamera: () => void connectMobileCamera(),
+    onUseMobileMic: () => void connectMobileMic(),
+  };
 
   return (
     <AnimatePresence>
-      <motion.div
-        initial={{ opacity: 0, y: 24, scale: 0.96 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        exit={{ opacity: 0, y: 24, scale: 0.96 }}
+      <motion.aside
+        initial={docked ? { opacity: 0, x: 24 } : { opacity: 0, y: 24, scale: 0.96 }}
+        animate={docked ? { opacity: 1, x: 0 } : { opacity: 1, y: 0, scale: 1 }}
+        exit={docked ? { opacity: 0, x: 24 } : { opacity: 0, y: 24, scale: 0.96 }}
         transition={{ type: "spring", damping: 26, stiffness: 280 }}
-        className={`card card-shadow overflow-hidden ${panelClass(viewMode)}`}
+        className={panelClass(viewMode)}
+        aria-label="SyncRoom"
       >
-        <div className="flex items-center justify-between border-b border-white/10 bg-white/[0.02] px-3 py-2">
-          <div className="flex items-center gap-2 text-sm font-semibold text-gray-100">
-            <span className="relative flex h-2 w-2">
+        <div className="flex shrink-0 items-center justify-between gap-2 border-b border-white/10 px-3 py-2.5">
+          <div className="flex min-w-0 items-center gap-2 text-sm font-semibold text-gray-100">
+            <span className="relative flex h-2 w-2 shrink-0">
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
               <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
             </span>
-            {inLobby ? "Join SyncRoom" : connecting ? "Connecting…" : "SyncRoom"}
+            <span className="truncate">
+              {inLobby ? "Join SyncRoom" : connecting ? "Connecting…" : "Team session"}
+            </span>
             {!inLobby && (
-              <span className="flex items-center gap-1 text-xs font-normal text-gray-400">
+              <span className="flex shrink-0 items-center gap-1 text-xs font-normal text-gray-400">
                 <Users className="h-3.5 w-3.5" /> {total}
               </span>
             )}
           </div>
-          <CallHeaderControls viewMode={viewMode} onViewMode={setViewMode} />
+          <div className="flex shrink-0 items-center gap-1">
+            <button
+              type="button"
+              onClick={endOrClose}
+              className="flex items-center gap-1 rounded-md bg-red-600/90 px-2 py-1.5 text-xs font-semibold text-white hover:bg-red-500"
+              title={inCall || connecting ? "End team session" : "Close"}
+            >
+              {inCall || connecting ? (
+                <>
+                  <PhoneOff className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">End</span>
+                </>
+              ) : (
+                <>
+                  <X className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">Close</span>
+                </>
+              )}
+            </button>
+            <CallHeaderControls viewMode={viewMode} onViewMode={setViewMode} />
+          </div>
         </div>
 
-        {contextTask && showBody && (
-          <p className="border-b border-white/10 bg-brand-500/10 px-3 py-2 text-xs text-brand-200">
-            Live discussion: <span className="font-medium text-brand-100">“{contextTask.title}”</span>
-          </p>
-        )}
-
         {showBody && (
-          <>
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+            {contextTask && <SyncRoomTaskSpotlight />}
+
             {inLobby && (
-              <CallLobby
-                localStream={localStream}
-                userName={user?.name ?? "You"}
-                avatarColor={user?.avatarColor ?? "#6366f1"}
-                micOn={micOn}
-                camOn={camOn}
-                cameras={cameras}
-                mics={mics}
-                cameraId={cameraId}
-                micId={micId}
-                rosterCount={roster.length}
-                onClose={closeLobby}
-                onJoinVideo={() => void join({ video: true })}
-                onJoinAudio={() => void join({ video: false })}
-                onCameraChange={(id) => void setCameraId(id)}
-                onMicChange={(id) => void setMicId(id)}
-                onToggleMic={toggleMic}
-                onToggleCam={toggleCam}
-              />
+              <div className="min-h-0 flex-1 overflow-y-auto">
+                <CallLobby
+                  localStream={localStream}
+                  userName={user?.name ?? "You"}
+                  avatarColor={user?.avatarColor ?? "#2a9d8f"}
+                  micOn={micOn}
+                  camOn={camOn}
+                  {...devicePickerProps}
+                  rosterCount={roster.length}
+                  onClose={closeLobby}
+                  onJoinVideo={() => void join({ video: true })}
+                  onJoinAudio={() => void join({ video: false })}
+                  onToggleMic={toggleMic}
+                  onToggleCam={toggleCam}
+                />
+              </div>
             )}
 
             {connecting && (
-              <div className="flex h-40 items-center justify-center gap-2 text-sm text-gray-400">
+              <div className="flex flex-1 items-center justify-center gap-2 text-sm text-gray-400">
                 <span className="h-4 w-4 animate-spin rounded-full border-2 border-brand-500 border-t-transparent" />
                 Connecting to teammates…
               </div>
             )}
 
             {inCall && (
-              <CallRoom
-                localStream={localStream}
-                localName={user?.name ?? "You"}
-                localAvatar={user?.avatarColor ?? "#6366f1"}
-                localMicOn={micOn}
-                localCamOn={camOn}
-                localSharing={sharingScreen}
-                participants={participants}
-              />
+              <>
+                <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+                  <CallRoom
+                    localStream={localStream}
+                    localName={user?.name ?? "You"}
+                    localAvatar={user?.avatarColor ?? "#2a9d8f"}
+                    localMicOn={micOn}
+                    localCamOn={camOn}
+                    localSharing={sharingScreen}
+                    participants={participants}
+                    speakerId={speakerId}
+                    compact={docked}
+                  />
+                  <div className="border-t border-white/10 px-3 py-2">
+                    <CallDevicePicker {...devicePickerProps} compact />
+                  </div>
+                  <SyncRoomSessionTools />
+                </div>
+
+                <CallControls {...controlProps} pinned />
+              </>
             )}
-          </>
+          </div>
         )}
 
-        {inCall && (
-          <CallControls
-            micOn={micOn}
-            camOn={camOn}
-            sharingScreen={sharingScreen}
-            viewMode={viewMode}
-            onToggleMic={toggleMic}
-            onToggleCam={toggleCam}
-            onToggleScreen={() => void toggleScreen()}
-            onCopyLink={() => void copyInviteLink()}
-            onLeave={leave}
-            onViewMode={setViewMode}
-          />
-        )}
-      </motion.div>
+        {minimized && inCall && <CallControls {...controlProps} compact pinned />}
+      </motion.aside>
     </AnimatePresence>
   );
 }

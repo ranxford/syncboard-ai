@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { AuthScreen } from "@/components/AuthScreen";
 
 export const metadata: Metadata = {
-  title: "Sign in — SyncBoard AI+",
+  title: "Sign in — SyncBoard",
 };
 
 export default function LoginPage() {

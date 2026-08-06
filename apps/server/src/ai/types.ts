@@ -5,7 +5,9 @@ export type InsightType =
   | "deadline_risk"
   | "wip_limit"
   | "workload"
-  | "throughput";
+  | "throughput"
+  | "alignment"
+  | "requirements";
 
 export interface Insight {
   id: string;

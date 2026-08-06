@@ -8,23 +8,9 @@ import { useBoard } from "@/store/board";
 import { toast } from "@/store/toast";
 import { useEscape } from "@/lib/useEscape";
 import type { Column, Member, MeetingResult, Priority } from "@/lib/types";
+import { matchMemberByHint } from "@/lib/syncRoom/applyOutcomes";
+import { meetingSampleForField } from "@/lib/projectFields";
 import { PRIORITY_STYLES } from "@/lib/ui";
-
-const SAMPLE = `Standup notes:
-- Ada will finish the WebSocket presence feature by Friday.
-- We decided to go with SQLite for local dev and Postgres in production.
-- Grace needs to review the security audit, it's urgent.
-- Someone should investigate the offline sync edge cases.
-- Linus to prepare the demo deck for next week.`;
-
-function matchMember(hint: string | undefined, members: Member[]): string | null {
-  if (!hint) return null;
-  const h = hint.trim().toLowerCase();
-  const found = members.find(
-    (m) => m.name.toLowerCase() === h || m.name.toLowerCase().split(" ")[0] === h,
-  );
-  return found?.id ?? null;
-}
 
 export function MeetingModal({
   projectId,
@@ -37,7 +23,9 @@ export function MeetingModal({
   members: Member[];
   onClose: () => void;
 }) {
+  const board = useBoard((s) => s.board);
   const applyServerBoard = useBoard((s) => s.applyServerBoard);
+  const sample = meetingSampleForField(board?.project.field);
   const [transcript, setTranscript] = useState("");
   const [result, setResult] = useState<MeetingResult | null>(null);
   const [busy, setBusy] = useState(false);
@@ -67,7 +55,7 @@ export function MeetingModal({
       .map((a) => ({
         title: a.title,
         priority: a.priority as Priority,
-        assigneeId: matchMember(a.assigneeHint, members),
+        assigneeId: matchMemberByHint(a.assigneeHint, members),
       }));
     if (items.length === 0) return;
     setBusy(true);
@@ -110,7 +98,7 @@ export function MeetingModal({
           <div>
             <div className="mb-1 flex items-center justify-between">
               <label className="text-xs font-medium text-gray-400">Paste meeting transcript or notes</label>
-              <button onClick={() => setTranscript(SAMPLE)} className="text-xs text-brand-400 hover:underline">
+              <button onClick={() => setTranscript(sample)} className="text-xs text-brand-400 hover:underline">
                 Use sample
               </button>
             </div>
@@ -158,7 +146,7 @@ export function MeetingModal({
                   <div className="space-y-2">
                     {result.actionItems.map((a, i) => {
                       const prio = PRIORITY_STYLES[a.priority as Priority];
-                      const matchedId = matchMember(a.assigneeHint, members);
+                      const matchedId = matchMemberByHint(a.assigneeHint, members);
                       const matched = members.find((m) => m.id === matchedId);
                       return (
                         <label key={i} className="glass flex cursor-pointer items-start gap-3 rounded-xl p-3">

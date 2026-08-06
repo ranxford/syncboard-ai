@@ -27,4 +27,8 @@ export type CallViewMode = "minimized" | "default" | "expanded" | "fullscreen";
 export interface MediaDeviceOption {
   deviceId: string;
   label: string;
+  /** Continuity Camera, Camo, EpocCam, Android tethering, etc. */
+  isMobileDevice?: boolean;
+  /** @deprecated use isMobileDevice */
+  isPhoneCamera?: boolean;
 }

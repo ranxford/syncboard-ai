@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { api, NetworkError } from "@/lib/api";
 import { enqueue, flushQueue, loadQueue } from "@/lib/offlineQueue";
+import { logBoardActivity } from "@/lib/syncRoom/boardSessionLog";
 import { toast } from "@/store/toast";
 import type { Board, Column, Priority, PresenceUser, Task } from "@/lib/types";
 
@@ -144,6 +145,8 @@ export const useBoard = create<BoardState>((set, get) => ({
     try {
       const res = await api.createTask(projectId, { columnId, ...data });
       get().applyServerBoard(res.board);
+      const colName = board.columns.find((c) => c.id === columnId)?.name ?? "board";
+      logBoardActivity(`created “${data.title}” in ${colName}`, "task_created");
     } catch (e) {
       if (e instanceof NetworkError) {
         const prev = get().connection;
@@ -160,6 +163,7 @@ export const useBoard = create<BoardState>((set, get) => ({
   updateTask: async (taskId, data) => {
     const { board, projectId } = get();
     if (!board || !projectId) return;
+    const existing = board.columns.flatMap((c) => c.tasks).find((t) => t.id === taskId);
     const member = data.assigneeId !== undefined ? board.members.find((m) => m.id === data.assigneeId) : undefined;
     set({
       board: mapColumns(board, (c) => ({
@@ -184,6 +188,7 @@ export const useBoard = create<BoardState>((set, get) => ({
     try {
       const res = await api.updateTask(taskId, data);
       get().applyServerBoard(res.board);
+      if (existing) logBoardActivity(`updated “${existing.title}”`, "task_updated");
     } catch (e) {
       if (e instanceof NetworkError) {
         const prev = get().connection;
@@ -202,6 +207,8 @@ export const useBoard = create<BoardState>((set, get) => ({
     if (!board || !projectId) return;
     const { board: without, task } = removeTask(board, taskId);
     if (!task) return;
+    const fromCol = board.columns.find((c) => c.tasks.some((t) => t.id === taskId));
+    const toCol = board.columns.find((c) => c.id === toColumnId);
     const moved: Task = { ...task, columnId: toColumnId };
     const next = mapColumns(without, (c) => {
       if (c.id !== toColumnId) return c;
@@ -214,6 +221,10 @@ export const useBoard = create<BoardState>((set, get) => ({
     try {
       const res = await api.moveTask(taskId, toColumnId, index);
       get().applyServerBoard(res.board);
+      logBoardActivity(
+        `moved “${task.title}” ${fromCol?.name ?? "?"} → ${toCol?.name ?? "?"}`,
+        "task_moved",
+      );
     } catch (e) {
       if (e instanceof NetworkError) {
         const prev = get().connection;
@@ -230,10 +241,12 @@ export const useBoard = create<BoardState>((set, get) => ({
   deleteTask: async (taskId) => {
     const { board, projectId } = get();
     if (!board || !projectId) return;
+    const removed = board.columns.flatMap((c) => c.tasks).find((t) => t.id === taskId);
     set({ board: removeTask(board, taskId).board });
     try {
       const res = await api.deleteTask(taskId);
       get().applyServerBoard(res.board);
+      if (removed) logBoardActivity(`deleted “${removed.title}”`, "task_deleted");
     } catch (e) {
       if (e instanceof NetworkError) {
         const prev = get().connection;

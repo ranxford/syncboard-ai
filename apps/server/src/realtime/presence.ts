@@ -46,6 +46,15 @@ class PresenceManager {
     return affected;
   }
 
+  /** Remove a socket from one project board only. */
+  leaveProject(socketId: string, projectId: string): boolean {
+    const members = this.rooms.get(projectId);
+    if (!members) return false;
+    const removed = members.delete(socketId);
+    if (members.size === 0) this.rooms.delete(projectId);
+    return removed;
+  }
+
   setFocus(socketId: string, focusedTaskId: string | null): string[] {
     const affected: string[] = [];
     for (const [projectId, members] of this.rooms.entries()) {
@@ -60,7 +69,8 @@ class PresenceManager {
   }
 
   /** De-duplicated list of users present on a board (a user may have multiple tabs). */
-  list(projectId: string): PublicPresence[] {
+  list(projectId: string, opts?: { includeFocus?: boolean }): PublicPresence[] {
+    const includeFocus = opts?.includeFocus ?? false;
     const members = this.rooms.get(projectId);
     if (!members) return [];
     const byUser = new Map<string, PublicPresence>();
@@ -72,7 +82,8 @@ class PresenceManager {
           userId: m.userId,
           name: m.name,
           avatarColor: m.avatarColor,
-          focusedTaskId: m.focusedTaskId,
+          // Peers only see who is online; task focus is admin-only (via awareness).
+          focusedTaskId: includeFocus ? m.focusedTaskId : null,
         });
       }
     }
