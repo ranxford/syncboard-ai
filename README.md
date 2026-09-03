@@ -66,6 +66,7 @@ Workload balancing, rebalancing suggestions, and predictive risk detection — d
 
 | Doc | Purpose |
 | --- | --- |
+| [CODE_STRUCTURE.md](./docs/CODE_STRUCTURE.md) | **Full file map** — where every frontend & backend file lives |
 | [LOCAL_SETUP.md](./docs/LOCAL_SETUP.md) | **Team onboarding** — clone, setup, demo accounts, feature checklist |
 | [COLLABORATION.md](./docs/COLLABORATION.md) | Who sees what — projects, presence, teammate awareness |
 | [ARCHITECTURE.md](./docs/ARCHITECTURE.md) | System design, realtime channels, data model |
@@ -160,6 +161,9 @@ syncboard-ai/
 
 > **Team onboarding:** share [docs/LOCAL_SETUP.md](./docs/LOCAL_SETUP.md) with colleagues —
 > clone, `npm run setup`, `npm run dev`, and sign in with the demo accounts below.
+>
+> **Finding the code:** all frontend + backend source is under `apps/`. See
+> [docs/CODE_STRUCTURE.md](./docs/CODE_STRUCTURE.md) for the complete file map and GitHub links.
 
 ### Prerequisites
 - **Node.js ≥ 18.18** (v20 LTS recommended) and npm
