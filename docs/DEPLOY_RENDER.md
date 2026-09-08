@@ -158,6 +158,8 @@ Easier: register real accounts through signup (verification is off until you ena
 
 | Symptom | Fix |
 | --- | --- |
+| Login fails after working before | Free tier wipes SQLite on deploy unless a **persistent disk** is attached (Starter plan). Re-signup works; demo accounts are recreated automatically on API boot. |
+| Demo account invalid | Wait for API deploy to finish — `ada@syncboard.dev` / `password123` is created on startup if missing. |
 | CORS / login blocked | `WEB_ORIGIN` on API must exactly match web URL (no trailing slash) |
 | WebSocket fails | `NEXT_PUBLIC_SOCKET_URL` must match API URL; redeploy web |
 | Email not sent | Check `RESEND_API_KEY` on API; check Render logs |
