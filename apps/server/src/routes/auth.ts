@@ -6,6 +6,7 @@ import { prisma } from "../prisma.js";
 import { signToken } from "../lib/jwt.js";
 import { requireAuth, type AuthedRequest } from "../middleware/auth.js";
 import { ensurePersonalTimeline } from "../lib/timelines.js";
+import { env } from "../env.js";
 import { sendVerificationEmail, EmailNotConfiguredError, EmailDeliveryError } from "../lib/email.js";
 
 export const authRouter = Router();
@@ -107,7 +108,7 @@ authRouter.post("/register", async (req, res) => {
 
   const passwordHash = await bcrypt.hash(password, 10);
   const avatarColor = AVATAR_COLORS[Math.floor(Math.random() * AVATAR_COLORS.length)];
-  const skipVerify = process.env.NODE_ENV === "test";
+  const skipVerify = process.env.NODE_ENV === "test" || !env.requireEmailVerification;
   const token = newConfirmToken();
 
   const user = await prisma.user.create({
@@ -224,7 +225,8 @@ authRouter.post("/login", async (req, res) => {
   if (!ok) {
     return res.status(401).json({ error: "Invalid email or password" });
   }
-  if (!user.emailVerifiedAt) {
+  let activeUser = user;
+  if (env.requireEmailVerification && !user.emailVerifiedAt) {
     return res.status(403).json({
       error: "Please confirm your email before signing in",
       needsVerification: true,
@@ -232,9 +234,16 @@ authRouter.post("/login", async (req, res) => {
     });
   }
 
-  await acceptPendingInvites(user.id, user.email);
-  const token = signToken({ userId: user.id, email: user.email });
-  return res.json({ token, user: publicUser(user) });
+  if (!user.emailVerifiedAt) {
+    activeUser = await prisma.user.update({
+      where: { id: user.id },
+      data: { emailVerifiedAt: new Date(), emailConfirmToken: null, emailConfirmExpires: null },
+    });
+  }
+
+  await acceptPendingInvites(activeUser.id, activeUser.email);
+  const token = signToken({ userId: activeUser.id, email: activeUser.email });
+  return res.json({ token, user: publicUser(activeUser) });
 });
 
 authRouter.get("/me", requireAuth, async (req: AuthedRequest, res) => {

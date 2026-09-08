@@ -114,9 +114,8 @@ Open `https://syncboard-web.onrender.com` (your web URL):
 
 - [ ] Landing page loads
 - [ ] `https://syncboard-api.onrender.com/health` returns `{"status":"ok",...}`
-- [ ] Register → verification email arrives (Resend account email on free tier)
-- [ ] Click confirm link → lands on `/verify` on the **web** host
-- [ ] Sign in, create/open a project, drag a card
+- [ ] Register → signed in immediately (no email verification until domain is verified)
+- [ ] Sign in with existing account
 
 **Free tier cold start:** API may sleep after ~15 min idle; first request can take 30–60s.
 
@@ -131,8 +130,9 @@ Open `https://syncboard-web.onrender.com` (your web URL):
 | `JWT_SECRET` | Render (auto) | Do not change casually |
 | `WEB_ORIGIN` | Blueprint link | Must match web URL exactly |
 | `DATABASE_URL` | Blueprint | SQLite on persistent disk |
-| `RESEND_API_KEY` | You at sync | Required for signup emails |
+| `RESEND_API_KEY` | You at sync | Only needed when `REQUIRE_EMAIL_VERIFICATION=true` |
 | `EMAIL_FROM` | Blueprint default | Change after domain verify |
+| `REQUIRE_EMAIL_VERIFICATION` | Blueprint | `false` — set `true` after Resend domain verify |
 | `AI_PROVIDER` | Blueprint | `heuristic` (no OpenAI key needed) |
 
 ### syncboard-web
@@ -150,7 +150,7 @@ If you change `NEXT_PUBLIC_*`, **redeploy syncboard-web** (rebuild required).
 
 Production starts with an empty database. To load Ada/Grace/Linus demo accounts, open **syncboard-api** → **Shell** (paid plans) or run seed locally against production DB (not recommended).
 
-Easier: register real accounts through the signup + verify flow.
+Easier: register real accounts through signup (verification is off until you enable it).
 
 ---
 

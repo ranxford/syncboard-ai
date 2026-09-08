@@ -60,10 +60,13 @@ All demo accounts use password **`password123`** (emails are pre-verified):
 After seed, open the shared board from the dashboard (**SyncBoard Launch**) or run
 `npm run db:seed` again to print the direct board URL.
 
-## 4b. Email verification (required for new signups)
+## 4b. Email verification (optional)
 
-New accounts **must** confirm email before signing in. Configure one provider in
-`apps/server/.env`:
+By default, new accounts are **verified immediately** — no confirmation email is sent.
+Set `REQUIRE_EMAIL_VERIFICATION=true` in `apps/server/.env` once you have a verified
+Resend domain and want signup confirmation emails.
+
+When verification is enabled, configure one provider in `apps/server/.env`:
 
 ### Option A — Resend (easiest)
 

@@ -44,4 +44,6 @@ export const env = {
     },
   },
   isProd: process.env.NODE_ENV === "production",
+  /** Set REQUIRE_EMAIL_VERIFICATION=true once Resend domain is verified. */
+  requireEmailVerification: process.env.REQUIRE_EMAIL_VERIFICATION === "true",
 };
