@@ -8,7 +8,7 @@
   ],
   "scripts": {
     "dev": "concurrently -n server,web -c blue,magenta \"npm:dev:server\" \"npm:dev:web\"",
-    "dev:clean": "lsof -ti tcp:3000,tcp:4000 | xargs kill -9 2>/dev/null || true && rm -rf apps/web/.next && npm run dev",
+    "dev:clean": "for port in 3000 4000; do lsof -ti tcp:$port | xargs kill -9 2>/dev/null || true; done && rm -rf apps/web/.next && npm run dev",
     "dev:server": "npm run dev --workspace apps/server",
     "dev:web": "npm run dev --workspace apps/web",
     "build": "npm run build --workspace apps/server && npm run build --workspace apps/web",
@@ -20,10 +20,14 @@
     "db:seed": "npm run db:seed --workspace apps/server",
     "db:studio": "npm run db:studio --workspace apps/server",
     "test": "npm run test --workspace apps/server",
-    "setup": "npm install && node scripts/bootstrap-env.mjs && npm run db:setup && npm run db:seed"
+    "setup": "npm install && node scripts/bootstrap-env.mjs && npm run db:setup && npm run db:seed",
+    "source:manifest": "node scripts/generate-source-manifest.mjs",
+    "email:test": "node scripts/test-email.mjs",
+    "docs:pdf": "node scripts/generate-documentation-pdf.mjs"
   },
   "devDependencies": {
-    "concurrently": "^9.1.2"
+    "concurrently": "^9.1.2",
+    "playwright": "^1.63.0"
   },
   "engines": {
     "node": ">=18.18"

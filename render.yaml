@@ -1,10 +1,22 @@
-# Render blueprint for the SyncBoard AI+ API.
-# Deploy: push to GitHub, then in Render → "New +" → "Blueprint" and select this repo.
+# SyncBoard AI+ — Render Blueprint (all environment variables)
 #
-# The web app (apps/web) is best deployed on Vercel (see README "Deployment").
-# Point its NEXT_PUBLIC_API_URL / NEXT_PUBLIC_SOCKET_URL at this service's URL.
+# WHAT YOU TYPE AT BLUEPRINT SYNC (Render prompts for sync: false keys):
+#   RESEND_API_KEY  →  your key from https://resend.com/api-keys  (starts with re_)
+#
+# WHAT RENDER FILLS AUTOMATICALLY:
+#   JWT_SECRET      →  random secret (generateValue)
+#   WEB_ORIGIN      →  linked from syncboard-web URL (after web deploys)
+#   NEXT_PUBLIC_*   →  linked from syncboard-api URL (after API deploys)
+#   PORT            →  set by Render on each service (do not add manually)
+#
+# WHY SECRETS ARE NOT IN THIS FILE:
+#   API keys must never be committed to GitHub. Render stores them securely
+#   when you paste at sync time.
+#
+# Docs: docs/DEPLOY_RENDER.md
 
 services:
+  # ── API (Express + Socket.io + Prisma) ─────────────────────────────────────
   - type: web
     name: syncboard-api
     runtime: docker
@@ -13,27 +25,64 @@ services:
     plan: free
     healthCheckPath: /health
     envVars:
+      # ── Core (required) ──
+      - key: NODE_ENV
+        value: production
       - key: JWT_SECRET
         generateValue: true
-      - key: WEB_ORIGIN
-        sync: false # set to your Vercel web URL, e.g. https://syncboard.vercel.app
-      - key: AI_PROVIDER
-        value: heuristic
-      # For OpenAI: set AI_PROVIDER=openai and add OPENAI_API_KEY in the dashboard.
-      # ── SQLite (default): persist the DB on a disk ──
       - key: DATABASE_URL
         value: file:./dev.db
+      - key: WEB_ORIGIN
+        fromService:
+          type: web
+          name: syncboard-web
+          envVarKey: RENDER_EXTERNAL_URL
+
+      # ── AI (heuristic = no OpenAI key needed for demos) ──
+      - key: AI_PROVIDER
+        value: heuristic
+      - key: OPENAI_API_KEY
+        value: ""
+      - key: OPENAI_MODEL
+        value: gpt-4o-mini
+
+      # ── Email / Resend (required for signup verification) ──
+      - key: RESEND_API_KEY
+        sync: false
+      - key: EMAIL_FROM
+        value: "SyncBoard <onboarding@resend.dev>"
+
+      # ── Optional (leave empty unless you add Redis later) ──
+      - key: REDIS_URL
+        value: ""
     disk:
       name: syncboard-data
       mountPath: /app/apps/server/prisma
       sizeGB: 1
 
-  # ── Optional: switch to managed Postgres + Redis for scale ──
-  # 1. Uncomment the databases block below.
-  # 2. Set DATABASE_URL above to fromDatabase, and change schema.prisma provider
-  #    to "postgresql".
-  # 3. Add a REDIS_URL env var pointing at the Redis instance.
-#
-# databases:
-#   - name: syncboard-postgres
-#     plan: free
+  # ── Web (Next.js 15) ───────────────────────────────────────────────────────
+  - type: web
+    name: syncboard-web
+    runtime: node
+    plan: free
+    buildCommand: npm ci && npm run build --workspace apps/web
+    startCommand: npm run start --workspace apps/web
+    healthCheckPath: /
+    envVars:
+      - key: NODE_VERSION
+        value: 20.18.0
+      - key: NODE_ENV
+        value: production
+      - key: NEXT_PUBLIC_API_URL
+        fromService:
+          type: web
+          name: syncboard-api
+          envVarKey: RENDER_EXTERNAL_URL
+      - key: NEXT_PUBLIC_SOCKET_URL
+        fromService:
+          type: web
+          name: syncboard-api
+          envVarKey: RENDER_EXTERNAL_URL
+      # Optional — only if WebRTC fails behind strict NAT:
+      - key: NEXT_PUBLIC_TURN_URL
+        value: ""

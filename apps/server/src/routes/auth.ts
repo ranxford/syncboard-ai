@@ -6,6 +6,7 @@ import { prisma } from "../prisma.js";
 import { signToken } from "../lib/jwt.js";
 import { requireAuth, type AuthedRequest } from "../middleware/auth.js";
 import { ensurePersonalTimeline } from "../lib/timelines.js";
+import { sendVerificationEmail, EmailNotConfiguredError, EmailDeliveryError } from "../lib/email.js";
 
 export const authRouter = Router();
 
@@ -52,6 +53,17 @@ function newConfirmToken() {
 
 function confirmExpiry() {
   return new Date(Date.now() + 24 * 60 * 60 * 1000);
+}
+
+function emailErrorResponse(res: import("express").Response, err: unknown) {
+  if (err instanceof EmailNotConfiguredError) {
+    return res.status(503).json({ error: err.message });
+  }
+  if (err instanceof EmailDeliveryError) {
+    return res.status(503).json({ error: `Could not send verification email: ${err.message}` });
+  }
+  console.error("[auth] email send failed:", err);
+  return res.status(503).json({ error: "Could not send verification email. Try again later." });
 }
 
 /** Auto-accept pending project invites for this email. */
@@ -116,14 +128,21 @@ authRouter.post("/register", async (req, res) => {
     return res.status(201).json({ token: jwt, user: publicUser(user) });
   }
 
-  console.log(`[auth] Email confirmation for ${user.email}: token=${token}`);
+  try {
+    await sendVerificationEmail({
+      to: user.email,
+      name: user.name,
+      token,
+    });
+  } catch (err) {
+    await prisma.user.delete({ where: { id: user.id } });
+    return emailErrorResponse(res, err);
+  }
 
   return res.status(201).json({
     needsVerification: true,
     email: user.email,
-    // Demo-friendly: no SMTP — token shown so confirmation can be completed locally
-    demoToken: token,
-    message: "Check your email to confirm your account. In demo mode the code is shown here.",
+    message: "Check your email to confirm your account.",
   });
 });
 
@@ -173,11 +192,20 @@ authRouter.post("/resend-confirmation", async (req, res) => {
     where: { id: user.id },
     data: { emailConfirmToken: token, emailConfirmExpires: confirmExpiry() },
   });
-  console.log(`[auth] Resent confirmation for ${user.email}: token=${token}`);
+
+  try {
+    await sendVerificationEmail({
+      to: user.email,
+      name: user.name,
+      token,
+    });
+  } catch (err) {
+    return emailErrorResponse(res, err);
+  }
+
   return res.json({
     ok: true,
-    demoToken: token,
-    message: "A new confirmation code was issued (shown in demo mode).",
+    message: "A new confirmation email was sent.",
   });
 });
 

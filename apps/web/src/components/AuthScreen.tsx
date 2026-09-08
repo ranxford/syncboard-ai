@@ -26,7 +26,6 @@ export function AuthScreen({ mode }: { mode: "login" | "register" }) {
     confirmEmail,
     resendConfirmation,
     pendingVerifyEmail,
-    pendingDemoToken,
     clearPendingVerify,
   } = useAuth();
   const isRegister = mode === "register";
@@ -40,6 +39,7 @@ export function AuthScreen({ mode }: { mode: "login" | "register" }) {
   const [touched, setTouched] = useState(false);
   const [busy, setBusy] = useState(false);
   const [verifyMode, setVerifyMode] = useState(false);
+  const [resendMsg, setResendMsg] = useState<string | null>(null);
 
   useEffect(() => {
     if (status === "authenticated") router.replace("/dashboard");
@@ -49,9 +49,8 @@ export function AuthScreen({ mode }: { mode: "login" | "register" }) {
     if (pendingVerifyEmail) {
       setVerifyMode(true);
       setEmail(pendingVerifyEmail);
-      if (pendingDemoToken) setConfirmCode(pendingDemoToken);
     }
-  }, [pendingVerifyEmail, pendingDemoToken]);
+  }, [pendingVerifyEmail]);
 
   const nameError = isRegister && !name.trim() ? "Please enter your name." : null;
   const emailError = !EMAIL_RE.test(email) ? "Enter a valid email address." : null;
@@ -113,11 +112,12 @@ export function AuthScreen({ mode }: { mode: "login" | "register" }) {
   async function onResend() {
     setBusy(true);
     setError(null);
+    setResendMsg(null);
     try {
-      const token = await resendConfirmation(email.trim() || pendingVerifyEmail || "");
-      if (token) setConfirmCode(token);
+      const message = await resendConfirmation(email.trim() || pendingVerifyEmail || "");
+      setResendMsg(message);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Couldn't resend code");
+      setError(err instanceof Error ? err.message : "Couldn't resend email");
     } finally {
       setBusy(false);
     }
@@ -185,9 +185,9 @@ export function AuthScreen({ mode }: { mode: "login" | "register" }) {
               </div>
               <h1 className="text-2xl font-bold tracking-tight text-gray-50">Confirm your email</h1>
               <p className="mb-7 mt-1 text-sm text-gray-400">
-                We sent a confirmation code to{" "}
-                <span className="text-gray-200">{email || pendingVerifyEmail}</span>. In demo mode
-                the code is shown below (no SMTP required).
+                We sent a confirmation link to{" "}
+                <span className="text-gray-200">{email || pendingVerifyEmail}</span>. Click the link
+                in your inbox, or paste the code below.
               </p>
               <form onSubmit={(e) => void onConfirm(e)} className="space-y-4">
                 <Field label="Confirmation code">
@@ -195,13 +195,13 @@ export function AuthScreen({ mode }: { mode: "login" | "register" }) {
                     className="input font-mono text-sm"
                     value={confirmCode}
                     onChange={(e) => setConfirmCode(e.target.value)}
-                    placeholder="Paste code from email / demo"
+                    placeholder="Paste code from email"
                     autoFocus
                   />
                 </Field>
-                {pendingDemoToken && (
-                  <p className="rounded-lg border border-brand-500/20 bg-brand-500/10 px-3 py-2 text-xs text-brand-200">
-                    Demo code: <span className="font-mono">{pendingDemoToken}</span>
+                {resendMsg && (
+                  <p className="rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-200">
+                    {resendMsg}
                   </p>
                 )}
                 {error && (
@@ -214,7 +214,7 @@ export function AuthScreen({ mode }: { mode: "login" | "register" }) {
                   {!busy && <ArrowRight className="h-4 w-4" />}
                 </button>
                 <button type="button" onClick={() => void onResend()} disabled={busy} className="btn-ghost w-full">
-                  Resend code
+                  Resend email
                 </button>
                 <button
                   type="button"
