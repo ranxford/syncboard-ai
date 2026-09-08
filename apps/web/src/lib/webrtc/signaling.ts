@@ -79,7 +79,18 @@ export function bindCallSignaling(handlers: Handlers) {
 export function emitCallJoin(
   projectId: string,
   media: { micOn: boolean; camOn: boolean; focusTaskId?: string | null; focusTaskTitle?: string | null },
-  ack: (res: { peers: CallPeerInfo[]; sessionId: string; notes: string; whiteboard: unknown[] } | { error: string }) => void,
+  ack: (
+    res:
+      | {
+          peers: CallPeerInfo[];
+          roster: CallPeerInfo[];
+          selfSocketId: string;
+          sessionId: string;
+          notes: string;
+          whiteboard: unknown[];
+        }
+      | { error: string },
+  ) => void,
 ) {
   getSocket().emit("call:join", { projectId, ...media }, ack);
 }

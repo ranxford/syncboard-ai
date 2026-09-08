@@ -35,6 +35,8 @@ export type { CallPeerInfo, Participant, CallPhase, CallViewMode, SessionEvent, 
 
 interface CallState {
   projectId: string | null;
+  /** Socket.io id for this client while in-call (used to filter self from roster). */
+  selfSocketId: string | null;
   phase: CallPhase;
   viewMode: CallViewMode;
   localStream: MediaStream | null;
@@ -104,16 +106,34 @@ function getMesh(): PeerMesh {
     mesh = new PeerMesh(
       (to, message) => emitCallSignal(to, message),
       (socketId, stream) => {
-        useCall.setState((s) => ({
-          participants: s.participants.map((p) =>
-            p.socketId === socketId ? { ...p, stream } : p,
-          ),
-        }));
+        useCall.setState((s) => {
+          const hit = s.participants.find((p) => p.socketId === socketId);
+          if (hit) {
+            return {
+              participants: s.participants.map((p) =>
+                p.socketId === socketId ? { ...p, stream } : p,
+              ),
+            };
+          }
+          const info = s.roster.find((p) => p.socketId === socketId);
+          if (info) {
+            return { participants: [...s.participants, { ...info, stream }] };
+          }
+          return s;
+        });
       },
       (socketId) => {
-        useCall.setState((s) => ({
-          participants: s.participants.filter((p) => p.socketId !== socketId),
-        }));
+        useCall.setState((s) => {
+          const stillInCall = s.roster.some((p) => p.socketId === socketId);
+          if (stillInCall) {
+            return {
+              participants: s.participants.map((p) =>
+                p.socketId === socketId ? { ...p, stream: null } : p,
+              ),
+            };
+          }
+          return { participants: s.participants.filter((p) => p.socketId !== socketId) };
+        });
       },
     );
   }
@@ -138,6 +158,25 @@ function upsertParticipant(info: CallPeerInfo, stream?: MediaStream | null) {
     }
     return { participants: [...s.participants, { ...info, stream: stream ?? null }] };
   });
+}
+
+/** Keep UI tiles aligned with the server roster while preserving WebRTC streams. */
+function syncParticipantsFromRoster(
+  roster: CallPeerInfo[],
+  selfSocketId: string | null,
+  existing: Participant[],
+): Participant[] {
+  const remote = roster.filter((p) => p.socketId !== selfSocketId);
+  const streams = new Map(existing.map((p) => [p.socketId, p.stream]));
+  return remote.map((r) => ({
+    ...r,
+    sharingScreen: r.sharingScreen ?? false,
+    stream: streams.get(r.socketId) ?? null,
+  }));
+}
+
+function normalizeRoster(participants: CallPeerInfo[]): CallPeerInfo[] {
+  return participants.map((p) => ({ ...p, sharingScreen: p.sharingScreen ?? false }));
 }
 
 function publishMedia() {
@@ -176,11 +215,17 @@ bindCallSignaling({
   projectId: () => useCall.getState().projectId,
   isInCall: () => useCall.getState().phase === "in-call",
   onRoster: (_projectId, participants) =>
-    useCall.setState({
-      roster: participants.map((p) => ({ ...p, sharingScreen: p.sharingScreen ?? false })),
+    useCall.setState((s) => {
+      const roster = normalizeRoster(participants);
+      if (s.phase !== "in-call") return { roster };
+      return {
+        roster,
+        participants: syncParticipantsFromRoster(roster, s.selfSocketId, s.participants),
+      };
     }),
   onPeerJoined: (peer) => {
     getMesh().rememberPeer(peer);
+    upsertParticipant(peer);
   },
   onPeerLeft: (socketId) => {
     getMesh().dropPeer(socketId);
@@ -221,6 +266,7 @@ bindCallSignaling({
 
 export const useCall = create<CallState>((set, get) => ({
   projectId: null,
+  selfSocketId: null,
   phase: "idle",
   viewMode: "default",
   localStream: null,
@@ -261,7 +307,7 @@ export const useCall = create<CallState>((set, get) => ({
   unobserve: () => {
     if (get().phase === "in-call") get().leave();
     if (get().phase === "lobby") get().closeLobby();
-    set({ projectId: null, roster: [], wrapUpOpen: false });
+    set({ projectId: null, roster: [], selfSocketId: null, wrapUpOpen: false });
   },
 
   openLobby: async (opts) => {
@@ -385,13 +431,19 @@ export const useCall = create<CallState>((set, get) => ({
 
       set({
         phase: "in-call",
+        selfSocketId: res.selfSocketId,
         sessionId: res.sessionId,
+        roster: normalizeRoster(res.roster),
+        participants: syncParticipantsFromRoster(
+          normalizeRoster(res.roster),
+          res.selfSocketId,
+          [],
+        ),
         collaborativeNotes: res.notes ?? "",
         whiteboardStrokes: (res.whiteboard ?? []) as WhiteboardStroke[],
       });
       for (const peer of res.peers) {
         getMesh().rememberPeer(peer);
-        upsertParticipant(peer);
         void getMesh().offerTo(peer.socketId);
       }
       publishMedia();
@@ -418,6 +470,7 @@ export const useCall = create<CallState>((set, get) => ({
       phase: "idle",
       localStream: null,
       participants: [],
+      selfSocketId: null,
       sharingScreen: false,
       viewMode: "default",
       sessionId: null,

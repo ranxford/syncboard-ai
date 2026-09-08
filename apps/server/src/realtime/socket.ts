@@ -100,10 +100,13 @@ export function initSocket(httpServer: HttpServer): Server {
     // ── Video meeting signaling (WebRTC) ──────────────────────────
     // The server never sees media; it only relays SDP/ICE and tracks the roster.
     function broadcastRoster(projectId: string) {
-      io.to(roomFor(projectId)).emit("call:participants", {
+      const payload = {
         projectId,
         participants: calls.list(projectId),
-      });
+      };
+      // Board viewers (lobby) and in-call peers may be in different Socket.io rooms.
+      io.to(roomFor(projectId)).emit("call:participants", payload);
+      io.to(callRoomFor(projectId)).emit("call:participants", payload);
     }
 
     socket.on(
@@ -116,7 +119,18 @@ export function initSocket(httpServer: HttpServer): Server {
           focusTaskId?: string | null;
           focusTaskTitle?: string | null;
         },
-        ack?: (res: { peers: ReturnType<typeof calls.list>; sessionId: string; notes: string; whiteboard: unknown[] } | { error: string }) => void,
+        ack?: (
+          res:
+            | {
+                peers: ReturnType<typeof calls.list>;
+                roster: ReturnType<typeof calls.list>;
+                selfSocketId: string;
+                sessionId: string;
+                notes: string;
+                whiteboard: unknown[];
+              }
+            | { error: string },
+        ) => void,
       ) => {
         const projectId = payload?.projectId;
         if (typeof projectId !== "string") return ack?.({ error: "bad-request" });
@@ -215,7 +229,16 @@ export function initSocket(httpServer: HttpServer): Server {
             taskTitle: payload.focusTaskTitle ?? null,
           });
         }
-        ack?.({ peers, sessionId, notes: sessionNotes, whiteboard });
+        const roster = calls.list(projectId);
+        socket.emit("call:participants", { projectId, participants: roster });
+        ack?.({
+          peers,
+          roster,
+          selfSocketId: socket.id,
+          sessionId,
+          notes: sessionNotes,
+          whiteboard,
+        });
       },
     );
 
