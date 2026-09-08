@@ -166,7 +166,7 @@ async function main() {
     await setEnvVars(renderKey, apiSvc.id, [
       { key: "NODE_ENV", value: "production" },
       { key: "JWT_SECRET", value: jwt },
-      { key: "DATABASE_URL", value: "file:./dev.db" },
+      { key: "DATABASE_URL", value: "file:./apps/server/prisma/dev.db" },
       { key: "AI_PROVIDER", value: "heuristic" },
       { key: "EMAIL_FROM", value: "SyncBoard <onboarding@resend.dev>" },
       { key: "REQUIRE_EMAIL_VERIFICATION", value: "false" },

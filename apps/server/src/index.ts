@@ -4,17 +4,32 @@ import { createApp } from "./app.js";
 import { prisma } from "./prisma.js";
 import { initSocket } from "./realtime/socket.js";
 import { verifyEmailTransport } from "./lib/email.js";
+import { ensureDemoUsers } from "./lib/bootstrapDb.js";
 
 const app = createApp();
 const server = http.createServer(app);
 initSocket(server);
+
+void (async () => {
+  try {
+    await ensureDemoUsers();
+  } catch (err) {
+    console.warn("[bootstrap] demo user setup failed:", err);
+  }
+})();
 
 server.listen(env.port, "0.0.0.0", () => {
   console.log(`\n  SyncBoard AI+ server`);
   console.log(`  → http://localhost:${env.port}`);
   console.log(`  → AI provider: ${env.ai.provider}`);
   console.log(`  → Web origin:  ${env.webOrigin}`);
-  console.log(`  → Email:       ${env.email.enabled ? `${env.email.provider} configured` : "NOT CONFIGURED — signups will fail"}\n`);
+  console.log(`  → Database:    ${env.databaseUrl}`);
+  const emailNote = env.email.enabled
+    ? `${env.email.provider} configured`
+    : env.requireEmailVerification
+      ? "NOT CONFIGURED — verification emails disabled until Resend/SMTP is set"
+      : "not configured (OK — email verification is off)";
+  console.log(`  → Email:       ${emailNote}\n`);
   if (env.email.enabled) void verifyEmailTransport();
 });
 

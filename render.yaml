@@ -31,7 +31,7 @@ services:
       - key: JWT_SECRET
         generateValue: true
       - key: DATABASE_URL
-        value: file:./dev.db
+        value: file:./apps/server/prisma/dev.db
       - key: WEB_ORIGIN
         fromService:
           type: web

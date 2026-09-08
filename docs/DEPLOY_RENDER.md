@@ -129,7 +129,7 @@ Open `https://syncboard-web.onrender.com` (your web URL):
 | --- | --- | --- |
 | `JWT_SECRET` | Render (auto) | Do not change casually |
 | `WEB_ORIGIN` | Blueprint link | Must match web URL exactly |
-| `DATABASE_URL` | Blueprint | SQLite on persistent disk |
+| `DATABASE_URL` | Blueprint | `file:./apps/server/prisma/dev.db` on persistent disk |
 | `RESEND_API_KEY` | You at sync | Only needed when `REQUIRE_EMAIL_VERIFICATION=true` |
 | `EMAIL_FROM` | Blueprint default | Change after domain verify |
 | `REQUIRE_EMAIL_VERIFICATION` | Blueprint | `false` — set `true` after Resend domain verify |
