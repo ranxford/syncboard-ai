@@ -3,6 +3,7 @@ import { env } from "./env.js";
 import { createApp } from "./app.js";
 import { prisma } from "./prisma.js";
 import { initSocket } from "./realtime/socket.js";
+import { verifyEmailTransport } from "./lib/email.js";
 
 const app = createApp();
 const server = http.createServer(app);
@@ -12,7 +13,9 @@ server.listen(env.port, () => {
   console.log(`\n  SyncBoard AI+ server`);
   console.log(`  → http://localhost:${env.port}`);
   console.log(`  → AI provider: ${env.ai.provider}`);
-  console.log(`  → Web origin:  ${env.webOrigin}\n`);
+  console.log(`  → Web origin:  ${env.webOrigin}`);
+  console.log(`  → Email:       ${env.email.enabled ? `${env.email.provider} configured` : "NOT CONFIGURED — signups will fail"}\n`);
+  if (env.email.enabled) void verifyEmailTransport();
 });
 
 let shuttingDown = false;

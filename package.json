@@ -20,10 +20,14 @@
     "db:seed": "npm run db:seed --workspace apps/server",
     "db:studio": "npm run db:studio --workspace apps/server",
     "test": "npm run test --workspace apps/server",
-    "setup": "npm install && node scripts/bootstrap-env.mjs && npm run db:setup && npm run db:seed"
+    "setup": "npm install && node scripts/bootstrap-env.mjs && npm run db:setup && npm run db:seed",
+    "source:manifest": "node scripts/generate-source-manifest.mjs",
+    "email:test": "node scripts/test-email.mjs",
+    "docs:pdf": "node scripts/generate-documentation-pdf.mjs"
   },
   "devDependencies": {
-    "concurrently": "^9.1.2"
+    "concurrently": "^9.1.2",
+    "playwright": "^1.63.0"
   },
   "engines": {
     "node": ">=18.18"

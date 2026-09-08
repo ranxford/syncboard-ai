@@ -1,10 +1,13 @@
-# Render blueprint for the SyncBoard AI+ API.
-# Deploy: push to GitHub, then in Render → "New +" → "Blueprint" and select this repo.
+# SyncBoard AI+ — Render Blueprint
+# 1. Push this repo to GitHub
+# 2. Render Dashboard → New + → Blueprint → select repo
+# 3. When prompted, paste RESEND_API_KEY
+# 4. After both services are live, redeploy syncboard-api if CORS fails (WEB_ORIGIN wiring)
 #
-# The web app (apps/web) is best deployed on Vercel (see README "Deployment").
-# Point its NEXT_PUBLIC_API_URL / NEXT_PUBLIC_SOCKET_URL at this service's URL.
+# Docs: docs/DEPLOY_RENDER.md
 
 services:
+  # ── API (Express + Socket.io + Prisma) ─────────────────────────────────────
   - type: web
     name: syncboard-api
     runtime: docker
@@ -15,25 +18,48 @@ services:
     envVars:
       - key: JWT_SECRET
         generateValue: true
-      - key: WEB_ORIGIN
-        sync: false # set to your Vercel web URL, e.g. https://syncboard.vercel.app
+      - key: NODE_ENV
+        value: production
       - key: AI_PROVIDER
         value: heuristic
-      # For OpenAI: set AI_PROVIDER=openai and add OPENAI_API_KEY in the dashboard.
-      # ── SQLite (default): persist the DB on a disk ──
       - key: DATABASE_URL
         value: file:./dev.db
+      # Frontend URL — used in verification emails (Resend) and CORS
+      - key: WEB_ORIGIN
+        fromService:
+          type: web
+          name: syncboard-web
+          envVarKey: RENDER_EXTERNAL_URL
+      # Paste at blueprint sync: https://resend.com → API Keys
+      - key: RESEND_API_KEY
+        sync: false
+      - key: EMAIL_FROM
+        value: "SyncBoard <onboarding@resend.dev>"
     disk:
       name: syncboard-data
       mountPath: /app/apps/server/prisma
       sizeGB: 1
 
-  # ── Optional: switch to managed Postgres + Redis for scale ──
-  # 1. Uncomment the databases block below.
-  # 2. Set DATABASE_URL above to fromDatabase, and change schema.prisma provider
-  #    to "postgresql".
-  # 3. Add a REDIS_URL env var pointing at the Redis instance.
-#
-# databases:
-#   - name: syncboard-postgres
-#     plan: free
+  # ── Web (Next.js 15) ───────────────────────────────────────────────────────
+  - type: web
+    name: syncboard-web
+    runtime: node
+    plan: free
+    buildCommand: npm ci && npm run build --workspace apps/web
+    startCommand: npm run start --workspace apps/web
+    healthCheckPath: /
+    envVars:
+      - key: NODE_VERSION
+        value: 20.18.0
+      - key: NODE_ENV
+        value: production
+      - key: NEXT_PUBLIC_API_URL
+        fromService:
+          type: web
+          name: syncboard-api
+          envVarKey: RENDER_EXTERNAL_URL
+      - key: NEXT_PUBLIC_SOCKET_URL
+        fromService:
+          type: web
+          name: syncboard-api
+          envVarKey: RENDER_EXTERNAL_URL

@@ -60,6 +60,45 @@ All demo accounts use password **`password123`** (emails are pre-verified):
 After seed, open the shared board from the dashboard (**SyncBoard Launch**) or run
 `npm run db:seed` again to print the direct board URL.
 
+## 4b. Email verification (required for new signups)
+
+New accounts **must** confirm email before signing in. Configure one provider in
+`apps/server/.env`:
+
+### Option A — Resend (easiest)
+
+1. Create a free account at [resend.com](https://resend.com)
+2. **API Keys** → create a key → paste into `.env`:
+
+```env
+RESEND_API_KEY=re_xxxxxxxxxxxx
+EMAIL_FROM="SyncBoard <onboarding@resend.dev>"
+```
+
+On the free tier, `onboarding@resend.dev` only delivers to the email address on your
+Resend account. To send to anyone, verify your domain in Resend and set
+`EMAIL_FROM="SyncBoard <noreply@yourdomain.com>"`.
+
+### Option B — SMTP (Gmail, SendGrid, etc.)
+
+```env
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_SECURE=false
+SMTP_USER=you@gmail.com
+SMTP_PASS=your-16-char-app-password
+EMAIL_FROM="SyncBoard <you@gmail.com>"
+```
+
+For Gmail: Google Account → Security → 2-Step Verification → App passwords.
+
+Restart the server after editing `.env`. Startup should show `Email: resend configured`
+or `Email: smtp configured`. Without either, **signups return an error**.
+
+Demo seed accounts (`ada@`, `grace@`, `linus@`) remain pre-verified.
+
+Flow: sign up → real email with link + code → confirm → dashboard.
+
 ## 5. Try everything locally
 
 | Feature | How |

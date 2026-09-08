@@ -86,7 +86,6 @@ export const api = {
       user?: User;
       needsVerification?: boolean;
       email?: string;
-      demoToken?: string;
       message?: string;
     }>("/api/auth/register", {
       method: "POST",
@@ -100,7 +99,7 @@ export const api = {
     }),
 
   resendConfirmation: (email: string) =>
-    request<{ ok: true; demoToken?: string; message?: string }>("/api/auth/resend-confirmation", {
+    request<{ ok: true; message?: string }>("/api/auth/resend-confirmation", {
       method: "POST",
       body: JSON.stringify({ email }),
     }),

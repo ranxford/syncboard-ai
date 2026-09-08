@@ -66,6 +66,8 @@ Workload balancing, rebalancing suggestions, and predictive risk detection — d
 
 | Doc | Purpose |
 | --- | --- |
+| [PROJECT_DOCUMENTATION.md](./docs/PROJECT_DOCUMENTATION.md) | **Full FYP report** — supervisor presentation (template Part A) |
+| [PROJECT_DOCUMENTATION.pdf](./docs/PROJECT_DOCUMENTATION.pdf) | **PDF export** of the full report (`npm run docs:pdf`) |
 | [CODE_STRUCTURE.md](./docs/CODE_STRUCTURE.md) | **Full file map** — where every frontend & backend file lives |
 | [LOCAL_SETUP.md](./docs/LOCAL_SETUP.md) | **Team onboarding** — clone, setup, demo accounts, feature checklist |
 | [COLLABORATION.md](./docs/COLLABORATION.md) | Who sees what — projects, presence, teammate awareness |

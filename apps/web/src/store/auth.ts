@@ -7,12 +7,11 @@ interface AuthState {
   user: User | null;
   status: "loading" | "authenticated" | "unauthenticated";
   pendingVerifyEmail: string | null;
-  pendingDemoToken: string | null;
   hydrate: () => Promise<void>;
   login: (email: string, password: string) => Promise<void>;
   register: (name: string, email: string, password: string) => Promise<"verified" | "needsVerification">;
   confirmEmail: (email: string, token: string) => Promise<void>;
-  resendConfirmation: (email: string) => Promise<string | null>;
+  resendConfirmation: (email: string) => Promise<string>;
   clearPendingVerify: () => void;
   logout: () => void;
 }
@@ -21,7 +20,6 @@ export const useAuth = create<AuthState>((set) => ({
   user: null,
   status: "loading",
   pendingVerifyEmail: null,
-  pendingDemoToken: null,
 
   hydrate: async () => {
     if (!getToken()) {
@@ -41,18 +39,10 @@ export const useAuth = create<AuthState>((set) => ({
     try {
       const { token, user } = await api.login({ email, password });
       setToken(token);
-      set({
-        user,
-        status: "authenticated",
-        pendingVerifyEmail: null,
-        pendingDemoToken: null,
-      });
+      set({ user, status: "authenticated", pendingVerifyEmail: null });
     } catch (e) {
       if (e instanceof ApiError && e.data.needsVerification) {
-        set({
-          pendingVerifyEmail: (e.data.email as string) || email,
-          pendingDemoToken: null,
-        });
+        set({ pendingVerifyEmail: (e.data.email as string) || email });
       }
       throw e;
     }
@@ -63,7 +53,6 @@ export const useAuth = create<AuthState>((set) => ({
     if (res.needsVerification) {
       set({
         pendingVerifyEmail: res.email ?? email,
-        pendingDemoToken: res.demoToken ?? null,
         status: "unauthenticated",
         user: null,
       });
@@ -71,12 +60,7 @@ export const useAuth = create<AuthState>((set) => ({
     }
     if (res.token && res.user) {
       setToken(res.token);
-      set({
-        user: res.user,
-        status: "authenticated",
-        pendingVerifyEmail: null,
-        pendingDemoToken: null,
-      });
+      set({ user: res.user, status: "authenticated", pendingVerifyEmail: null });
       return "verified";
     }
     throw new Error("Unexpected registration response");
@@ -85,32 +69,20 @@ export const useAuth = create<AuthState>((set) => ({
   confirmEmail: async (email, token) => {
     const { token: jwt, user } = await api.confirmEmail({ email, token });
     setToken(jwt);
-    set({
-      user,
-      status: "authenticated",
-      pendingVerifyEmail: null,
-      pendingDemoToken: null,
-    });
+    set({ user, status: "authenticated", pendingVerifyEmail: null });
   },
 
   resendConfirmation: async (email) => {
     const res = await api.resendConfirmation(email);
-    if (res.demoToken) {
-      set({ pendingDemoToken: res.demoToken, pendingVerifyEmail: email });
-    }
-    return res.demoToken ?? null;
+    set({ pendingVerifyEmail: email });
+    return res.message ?? "Confirmation email sent.";
   },
 
-  clearPendingVerify: () => set({ pendingVerifyEmail: null, pendingDemoToken: null }),
+  clearPendingVerify: () => set({ pendingVerifyEmail: null }),
 
   logout: () => {
     setToken(null);
     disconnectSocket();
-    set({
-      user: null,
-      status: "unauthenticated",
-      pendingVerifyEmail: null,
-      pendingDemoToken: null,
-    });
+    set({ user: null, status: "unauthenticated", pendingVerifyEmail: null });
   },
 }));
