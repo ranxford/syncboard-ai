@@ -31,7 +31,8 @@ services:
       - key: JWT_SECRET
         generateValue: true
       - key: DATABASE_URL
-        value: file:./apps/server/prisma/dev.db
+        # Relative to prisma/schema.prisma → lands on the persistent disk mount
+        value: file:./dev.db
       - key: WEB_ORIGIN
         fromService:
           type: web

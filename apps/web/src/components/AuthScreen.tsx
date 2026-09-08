@@ -79,6 +79,10 @@ export function AuthScreen({ mode }: { mode: "login" | "register" }) {
       if (err instanceof ApiError && err.data.needsVerification) {
         setVerifyMode(true);
         setError("Confirm your email to continue.");
+      } else if (err instanceof ApiError && err.status === 401 && !isRegister) {
+        setError(
+          "Invalid email or password. If you signed up before a recent deploy, create a new account — hosted data resets unless a persistent disk is attached.",
+        );
       } else {
         setError(
           msg === "network-unavailable"
@@ -130,6 +134,25 @@ export function AuthScreen({ mode }: { mode: "login" | "register" }) {
     setError(null);
     setVerifyMode(false);
     clearPendingVerify();
+  }
+
+  async function useDemoAndSignIn() {
+    fillDemo();
+    setBusy(true);
+    setError(null);
+    try {
+      await login("ada@syncboard.dev", "password123");
+      router.replace("/dashboard");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Demo sign-in failed";
+      setError(
+        msg === "network-unavailable"
+          ? "Can't reach the server. Please check your connection and try again."
+          : `${msg} Try signing up with a new account instead.`,
+      );
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
@@ -335,8 +358,8 @@ export function AuthScreen({ mode }: { mode: "login" | "register" }) {
                   </Link>
                 </p>
               ) : (
-                <button onClick={fillDemo} className="btn-ghost mt-4 w-full py-2.5">
-                  Use demo account
+                <button onClick={() => void useDemoAndSignIn()} disabled={busy} className="btn-ghost mt-4 w-full py-2.5">
+                  {busy ? "Signing in…" : "Use demo account"}
                 </button>
               )}
             </>
