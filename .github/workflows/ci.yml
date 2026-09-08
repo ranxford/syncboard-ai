@@ -10,23 +10,8 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/syncboard?schema=public"
+      DATABASE_URL: "file:./dev.db"
       JWT_SECRET: "ci-test-secret"
-
-    services:
-      postgres:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: syncboard
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U postgres"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
 
     steps:
       - uses: actions/checkout@v4
@@ -41,8 +26,6 @@ jobs:
 
       - name: Generate Prisma client + sync schema
         run: npm run db:setup
-        env:
-          DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/syncboard?schema=public"
 
       - name: Lint (web)
         run: npm run lint

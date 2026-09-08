@@ -1,12 +1,16 @@
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import type { Server } from "node:http";
 
-// A throwaway Postgres database for this test run.
-process.env.DATABASE_URL =
-  process.env.DATABASE_URL ??
-  "postgresql://postgres:postgres@localhost:5432/syncboard_test?schema=public";
+// A throwaway SQLite database for this test run. Set BEFORE importing anything
+// that constructs the Prisma client (dotenv won't override an existing value).
+const tmpDir = mkdtempSync(join(tmpdir(), "syncboard-test-"));
+const dbFile = join(tmpDir, "test.db");
+process.env.DATABASE_URL = `file:${dbFile}`;
 process.env.JWT_SECRET = "test-secret";
 process.env.AI_PROVIDER = "heuristic";
 process.env.NODE_ENV = "test";
@@ -56,6 +60,7 @@ before(async () => {
 after(async () => {
   await prisma?.$disconnect();
   await new Promise<void>((resolve) => server?.close(() => resolve()));
+  rmSync(tmpDir, { recursive: true, force: true });
 });
 
 // Shared fixtures populated as the suite runs.
