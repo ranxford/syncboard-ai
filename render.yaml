@@ -15,6 +15,11 @@
 #
 # Docs: docs/DEPLOY_RENDER.md
 
+databases:
+  - name: syncboard-db
+    plan: free
+    region: oregon
+
 services:
   # ── API (Express + Socket.io + Prisma) ─────────────────────────────────────
   - type: web
@@ -31,8 +36,9 @@ services:
       - key: JWT_SECRET
         generateValue: true
       - key: DATABASE_URL
-        # Relative to prisma/schema.prisma → lands on the persistent disk mount
-        value: file:./dev.db
+        fromDatabase:
+          name: syncboard-db
+          property: connectionString
       - key: WEB_ORIGIN
         fromService:
           type: web
@@ -58,10 +64,6 @@ services:
       # ── Optional (leave empty unless you add Redis later) ──
       - key: REDIS_URL
         value: ""
-    disk:
-      name: syncboard-data
-      mountPath: /app/apps/server/prisma
-      sizeGB: 1
 
   # ── Web (Next.js 15) ───────────────────────────────────────────────────────
   - type: web

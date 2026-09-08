@@ -1,15 +1,11 @@
-// SyncBoard AI+ data model.
-//
-// Default provider is SQLite for zero-infra local development.
-// To use PostgreSQL (production), change `provider` to "postgresql" and point
-// DATABASE_URL at your Postgres instance (see docker-compose.yml + .env.example).
+// Default: PostgreSQL (Render production). For local SQLite, see docs/LOCAL_SETUP.md.
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 

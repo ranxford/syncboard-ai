@@ -8,6 +8,7 @@ import { motion } from "framer-motion";
 import { ArrowRight, Eye, EyeOff, LayoutList, Mail, Radio, Users } from "lucide-react";
 import { ApiError } from "@/lib/api";
 import { useAuth } from "@/store/auth";
+import { toast } from "@/store/toast";
 
 const highlights = [
   { icon: Users, title: "Invite-only communities", desc: "You choose who joins — no public feed." },
@@ -70,6 +71,7 @@ export function AuthScreen({ mode }: { mode: "login" | "register" }) {
           setVerifyMode(true);
           return;
         }
+        toast.success(`Account created for ${email.trim()}. You're signed in.`);
       } else {
         await login(email.trim(), password);
       }
