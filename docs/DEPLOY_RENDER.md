@@ -41,6 +41,30 @@ Deploy from `main` or your feature branch — pick the same branch in the Render
 
 First deploy takes ~5–10 minutes (Docker build for API, Next.js build for web).
 
+### Complete environment variable cheat sheet
+
+**You only type one value at Blueprint sync** — everything else is pre-filled in `render.yaml` or wired automatically.
+
+| Variable | Service | You enter? | Value to use |
+| --- | --- | --- | --- |
+| `RESEND_API_KEY` | API | **Yes** | `re_...` from [resend.com/api-keys](https://resend.com/api-keys) |
+| `JWT_SECRET` | API | No | Render generates |
+| `NODE_ENV` | Both | No | `production` |
+| `DATABASE_URL` | API | No | `file:./dev.db` |
+| `AI_PROVIDER` | API | No | `heuristic` |
+| `OPENAI_API_KEY` | API | No | leave empty |
+| `OPENAI_MODEL` | API | No | `gpt-4o-mini` |
+| `EMAIL_FROM` | API | No | `SyncBoard <onboarding@resend.dev>` |
+| `WEB_ORIGIN` | API | No | Auto → `https://syncboard-web.onrender.com` |
+| `NEXT_PUBLIC_API_URL` | Web | No | Auto → `https://syncboard-api.onrender.com` |
+| `NEXT_PUBLIC_SOCKET_URL` | Web | No | Same as API URL |
+| `NODE_VERSION` | Web | No | `20.18.0` |
+| `PORT` | Both | No | Render sets automatically |
+
+**Why not put the Resend key in `render.yaml`?** It would be committed to GitHub and anyone could steal it. Render’s `sync: false` prompts you once and stores it securely.
+
+**Why not hard-code URLs?** Your exact URLs (`syncboard-web.onrender.com`, etc.) do not exist until Render creates the services. The blueprint links them with `fromService` after the first deploy.
+
 ---
 
 ## Step 3 — First deploy quirks

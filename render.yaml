@@ -1,8 +1,17 @@
-# SyncBoard AI+ — Render Blueprint
-# 1. Push this repo to GitHub
-# 2. Render Dashboard → New + → Blueprint → select repo
-# 3. When prompted, paste RESEND_API_KEY
-# 4. After both services are live, redeploy syncboard-api if CORS fails (WEB_ORIGIN wiring)
+# SyncBoard AI+ — Render Blueprint (all environment variables)
+#
+# WHAT YOU TYPE AT BLUEPRINT SYNC (Render prompts for sync: false keys):
+#   RESEND_API_KEY  →  your key from https://resend.com/api-keys  (starts with re_)
+#
+# WHAT RENDER FILLS AUTOMATICALLY:
+#   JWT_SECRET      →  random secret (generateValue)
+#   WEB_ORIGIN      →  linked from syncboard-web URL (after web deploys)
+#   NEXT_PUBLIC_*   →  linked from syncboard-api URL (after API deploys)
+#   PORT            →  set by Render on each service (do not add manually)
+#
+# WHY SECRETS ARE NOT IN THIS FILE:
+#   API keys must never be committed to GitHub. Render stores them securely
+#   when you paste at sync time.
 #
 # Docs: docs/DEPLOY_RENDER.md
 
@@ -16,25 +25,36 @@ services:
     plan: free
     healthCheckPath: /health
     envVars:
-      - key: JWT_SECRET
-        generateValue: true
+      # ── Core (required) ──
       - key: NODE_ENV
         value: production
-      - key: AI_PROVIDER
-        value: heuristic
+      - key: JWT_SECRET
+        generateValue: true
       - key: DATABASE_URL
         value: file:./dev.db
-      # Frontend URL — used in verification emails (Resend) and CORS
       - key: WEB_ORIGIN
         fromService:
           type: web
           name: syncboard-web
           envVarKey: RENDER_EXTERNAL_URL
-      # Paste at blueprint sync: https://resend.com → API Keys
+
+      # ── AI (heuristic = no OpenAI key needed for demos) ──
+      - key: AI_PROVIDER
+        value: heuristic
+      - key: OPENAI_API_KEY
+        value: ""
+      - key: OPENAI_MODEL
+        value: gpt-4o-mini
+
+      # ── Email / Resend (required for signup verification) ──
       - key: RESEND_API_KEY
         sync: false
       - key: EMAIL_FROM
         value: "SyncBoard <onboarding@resend.dev>"
+
+      # ── Optional (leave empty unless you add Redis later) ──
+      - key: REDIS_URL
+        value: ""
     disk:
       name: syncboard-data
       mountPath: /app/apps/server/prisma
@@ -63,3 +83,6 @@ services:
           type: web
           name: syncboard-api
           envVarKey: RENDER_EXTERNAL_URL
+      # Optional — only if WebRTC fails behind strict NAT:
+      - key: NEXT_PUBLIC_TURN_URL
+        value: ""
