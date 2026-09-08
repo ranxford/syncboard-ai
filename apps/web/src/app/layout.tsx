@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Script from "next/script";
 import { DM_Sans, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
 import { AppBootstrap } from "@/components/AppBootstrap";
@@ -24,14 +25,12 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   const { apiUrl, socketUrl } = getServerRuntimeConfig();
-  const configScript = `window.__SYNCBOARD_CONFIG__=${JSON.stringify({ apiUrl, socketUrl })};`;
-
   return (
     <html lang="en" className={`${sans.variable} ${mono.variable}`}>
-      <head>
-        <script dangerouslySetInnerHTML={{ __html: configScript }} />
-      </head>
       <body className="min-h-screen bg-ink-950 font-sans text-gray-200 antialiased">
+        <Script id="syncboard-config" strategy="beforeInteractive">
+          {`window.__SYNCBOARD_CONFIG__=${JSON.stringify({ apiUrl, socketUrl })};`}
+        </Script>
         <AppBootstrap>{children}</AppBootstrap>
       </body>
     </html>
