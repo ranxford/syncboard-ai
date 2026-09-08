@@ -9,7 +9,7 @@ const app = createApp();
 const server = http.createServer(app);
 initSocket(server);
 
-server.listen(env.port, () => {
+server.listen(env.port, "0.0.0.0", () => {
   console.log(`\n  SyncBoard AI+ server`);
   console.log(`  → http://localhost:${env.port}`);
   console.log(`  → AI provider: ${env.ai.provider}`);
