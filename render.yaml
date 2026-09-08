@@ -65,7 +65,7 @@ services:
     name: syncboard-web
     runtime: node
     plan: free
-    buildCommand: npm ci && npm run build --workspace apps/web
+    buildCommand: npm ci --include=dev && npm run build --workspace apps/web
     startCommand: npm run start --workspace apps/web
     healthCheckPath: /
     envVars:

@@ -26,8 +26,7 @@
     "docs:pdf": "node scripts/generate-documentation-pdf.mjs"
   },
   "devDependencies": {
-    "concurrently": "^9.1.2",
-    "playwright": "^1.63.0"
+    "concurrently": "^9.1.2"
   },
   "engines": {
     "node": ">=18.18"
