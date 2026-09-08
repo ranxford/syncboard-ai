@@ -138,7 +138,7 @@ export function AuthScreen({ mode }: { mode: "login" | "register" }) {
     clearPendingVerify();
   }
 
-  async function useDemoAndSignIn() {
+  async function signInWithDemo() {
     fillDemo();
     setBusy(true);
     setError(null);
@@ -360,7 +360,7 @@ export function AuthScreen({ mode }: { mode: "login" | "register" }) {
                   </Link>
                 </p>
               ) : (
-                <button onClick={() => void useDemoAndSignIn()} disabled={busy} className="btn-ghost mt-4 w-full py-2.5">
+                <button onClick={() => void signInWithDemo()} disabled={busy} className="btn-ghost mt-4 w-full py-2.5">
                   {busy ? "Signing in…" : "Use demo account"}
                 </button>
               )}
