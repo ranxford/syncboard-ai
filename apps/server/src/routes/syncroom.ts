@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "../prisma.js";
 import { requireAuth, type AuthedRequest } from "../middleware/auth.js";
 import { assertMember } from "../lib/access.js";
+import { notifySyncRoomRecap } from "../realtime/notifications.js";
 
 export const syncroomRouter = Router();
 syncroomRouter.use(requireAuth);
@@ -33,6 +34,9 @@ syncroomRouter.patch("/sessions/:id", async (req: AuthedRequest, res) => {
   const parsed = finalizeSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: "Invalid payload" });
 
+  const incomingSummary = parsed.data.summary?.trim();
+  const hadSummary = Boolean(session.summary?.trim());
+
   const updated = await prisma.syncRoomSession.update({
     where: { id: session.id },
     data: {
@@ -47,6 +51,10 @@ syncroomRouter.patch("/sessions/:id", async (req: AuthedRequest, res) => {
       appliedAt: parsed.data.applied ? new Date() : session.appliedAt,
     },
   });
+
+  if (incomingSummary && !hadSummary) {
+    void notifySyncRoomRecap({ projectId: session.projectId, sessionId: session.id });
+  }
 
   res.json({
     session: {

@@ -24,6 +24,7 @@ export const env = {
       process.env.EMAIL_FROM ??
       (process.env.RESEND_API_KEY ? "SyncBoard <onboarding@resend.dev>" : "SyncBoard <noreply@syncboard.dev>"),
     resendApiKey: (process.env.RESEND_API_KEY ?? "").trim(),
+    sendgridApiKey: (process.env.SENDGRID_API_KEY ?? "").trim(),
     smtp: {
       host: process.env.SMTP_HOST ?? "",
       port: Number(process.env.SMTP_PORT ?? 587),
@@ -34,9 +35,14 @@ export const env = {
         return Boolean(this.host && this.user && this.pass);
       },
     },
-    get provider(): "resend" | "smtp" | null {
-      if (this.resendApiKey) return "resend";
+    get provider(): "sendgrid" | "resend" | "smtp" | null {
+      const pref = (process.env.EMAIL_PROVIDER ?? "").trim().toLowerCase();
+      if (pref === "sendgrid" && this.sendgridApiKey) return "sendgrid";
+      if (pref === "smtp" && this.smtp.enabled) return "smtp";
+      if (pref === "resend" && this.resendApiKey) return "resend";
       if (this.smtp.enabled) return "smtp";
+      if (this.sendgridApiKey) return "sendgrid";
+      if (this.resendApiKey) return "resend";
       return null;
     },
     get enabled() {

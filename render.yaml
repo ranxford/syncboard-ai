@@ -47,11 +47,26 @@ services:
       - key: OPENAI_MODEL
         value: gpt-4o-mini
 
-      # ── Email / Resend (required for signup verification) ──
-      - key: RESEND_API_KEY
+      # ── Email ──
+      # Local: Nodemailer + Gmail SMTP. Production (Render free): SendGrid API (HTTPS).
+      - key: EMAIL_PROVIDER
+        value: sendgrid
+      - key: SENDGRID_API_KEY
         sync: false
       - key: EMAIL_FROM
-        value: "SyncBoard <onboarding@resend.dev>"
+        sync: false
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_SECURE
+        value: "false"
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
       - key: REQUIRE_EMAIL_VERIFICATION
         value: "false"
 

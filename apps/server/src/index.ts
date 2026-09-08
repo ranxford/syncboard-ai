@@ -27,9 +27,13 @@ server.listen(env.port, "0.0.0.0", () => {
   const emailNote = env.email.enabled
     ? `${env.email.provider} configured`
     : env.requireEmailVerification
-      ? "NOT CONFIGURED — verification emails disabled until Resend/SMTP is set"
+      ? "NOT CONFIGURED — set Nodemailer SMTP, SendGrid, or Resend in apps/server/.env"
       : "not configured (OK — email verification is off)";
-  console.log(`  → Email:       ${emailNote}\n`);
+  console.log(`  → Email:       ${emailNote}`);
+  if (env.isProd && env.email.provider === "smtp") {
+    console.warn("  ⚠ Use EMAIL_PROVIDER=sendgrid on Render free tier (SMTP ports are blocked).");
+  }
+  console.log("");
   if (env.email.enabled) void verifyEmailTransport();
 });
 
