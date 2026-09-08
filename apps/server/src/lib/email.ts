@@ -146,6 +146,72 @@ export async function sendVerificationEmail(params: {
   console.log(`[email] Verification sent to ${params.to} via ${env.email.provider}`);
 }
 
+function projectInviteContent(params: {
+  projectName: string;
+  inviterName: string;
+  signupUrl: string;
+}) {
+  const subject = `You're invited to “${params.projectName}” on SyncBoard`;
+  const text = [
+    `${params.inviterName} invited you to collaborate on “${params.projectName}”.`,
+    "",
+    `Create your account with this email address to join automatically:`,
+    params.signupUrl,
+    "",
+    "If you already have an account, sign in with the same email and the project will appear on your dashboard.",
+  ].join("\n");
+
+  const html = `<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body style="margin:0;padding:0;background:#0b0f19;font-family:system-ui,-apple-system,sans-serif;color:#e5e7eb">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#0b0f19;padding:32px 16px">
+    <tr><td align="center">
+      <table width="100%" style="max-width:480px;background:#111827;border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:32px">
+        <tr><td>
+          <p style="margin:0 0 8px;font-size:13px;color:#2a9d8f;font-weight:600;letter-spacing:0.04em;text-transform:uppercase">SyncBoard</p>
+          <h1 style="margin:0 0 12px;font-size:22px;font-weight:600;color:#f9fafb">Project invite</h1>
+          <p style="margin:0 0 24px;font-size:14px;line-height:1.6;color:#9ca3af"><strong style="color:#d1d5db">${escapeHtml(params.inviterName)}</strong> invited you to <strong style="color:#d1d5db">${escapeHtml(params.projectName)}</strong>. Sign up with this email to join automatically.</p>
+          <a href="${params.signupUrl}" style="display:inline-block;background:#2a9d8f;color:#fff;text-decoration:none;font-size:14px;font-weight:600;padding:12px 24px;border-radius:8px">Join SyncBoard</a>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+
+  return { subject, text, html };
+}
+
+/** Invite someone without an account yet. Best-effort — failures are logged, not thrown. */
+export async function sendProjectInviteEmail(params: {
+  to: string;
+  projectName: string;
+  inviterName: string;
+}): Promise<boolean> {
+  if (!env.email.enabled) return false;
+
+  const signupUrl = `${env.webOrigin}/signup`;
+  const { subject, text, html } = projectInviteContent({
+    projectName: params.projectName,
+    inviterName: params.inviterName,
+    signupUrl,
+  });
+
+  try {
+    if (env.email.provider === "resend") {
+      await sendViaResend(params.to, subject, html, text);
+    } else {
+      await sendViaSmtp(params.to, subject, html, text);
+    }
+    console.log(`[email] Project invite sent to ${params.to} via ${env.email.provider}`);
+    return true;
+  } catch (err) {
+    console.warn(`[email] Project invite to ${params.to} failed:`, err instanceof Error ? err.message : err);
+    return false;
+  }
+}
+
 /** Verify email transport at startup (non-fatal). */
 export async function verifyEmailTransport(): Promise<boolean> {
   if (!env.email.enabled) return false;

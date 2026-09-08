@@ -54,8 +54,10 @@ export function TeamPanel({
       if (res.board) applyServerBoard(res.board);
       toast.success(
         res.invited?.status === "pending"
-          ? `Invite sent to ${email.trim()} (pending signup).`
-          : `Added ${email.trim()}.`,
+          ? res.emailSent
+            ? `Invite email sent to ${email.trim()}.`
+            : `Invite saved for ${email.trim()} — they'll join after signup with this email.`
+          : `Added ${email.trim()}. They'll get an in-app notification.`,
       );
       setEmail("");
       await load();

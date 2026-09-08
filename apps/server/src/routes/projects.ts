@@ -6,6 +6,8 @@ import { requireAuth, type AuthedRequest } from "../middleware/auth.js";
 import { assertCanManageTeam, assertMember, assertOwner, getMembership } from "../lib/access.js";
 import { activityVisibleToViewer, getBoardState, recordActivity } from "../lib/board.js";
 import { emitToProject } from "../realtime/io.js";
+import { notifyProjectAdded } from "../realtime/notifications.js";
+import { sendProjectInviteEmail } from "../lib/email.js";
 import { COMMUNITY_MILESTONES, ensurePersonalTimeline } from "../lib/timelines.js";
 import { columnsForField, isProjectField } from "../lib/projectFields.js";
 
@@ -248,6 +250,11 @@ projectsRouter.post("/:id/members", async (req: AuthedRequest, res) => {
 
   const email = parsed.data.email.toLowerCase();
   const role = parsed.data.role ?? "member";
+  const inviter = await prisma.user.findUnique({
+    where: { id: req.userId! },
+    select: { name: true },
+  });
+  const inviterName = inviter?.name ?? "A teammate";
   const user = await prisma.user.findUnique({ where: { email } });
 
   if (user) {
@@ -270,7 +277,13 @@ projectsRouter.post("/:id/members", async (req: AuthedRequest, res) => {
 
     const board = await getBoardState(req.params.id);
     emitToProject(req.params.id, "board:updated", { board });
-    return res.status(201).json({ board, invited: { email, status: "joined" } });
+    notifyProjectAdded({
+      userId: user.id,
+      projectId: project.id,
+      projectName: project.name,
+      inviterName,
+    });
+    return res.status(201).json({ board, invited: { email, status: "joined" }, notified: true });
   }
 
   const pending = await prisma.projectInvite.findFirst({
@@ -298,9 +311,18 @@ projectsRouter.post("/:id/members", async (req: AuthedRequest, res) => {
 
   console.log(`[invite] Pending invite for ${email} on project ${req.params.id}: token=${invite.token}`);
 
+  const emailSent = await sendProjectInviteEmail({
+    to: email,
+    projectName: project.name,
+    inviterName,
+  });
+
   res.status(201).json({
     invited: { email, status: "pending", inviteId: invite.id },
-    message: "No account yet — invite saved. They join automatically after signup + email confirm.",
+    emailSent,
+    message: emailSent
+      ? "Invite email sent. They join automatically after signup with this email."
+      : "Invite saved. They join automatically after signup with this email (email not configured or delivery failed).",
   });
 });
 

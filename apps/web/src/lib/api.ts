@@ -160,6 +160,8 @@ export const api = {
     request<{
       board?: Board;
       invited?: { email: string; status: string; inviteId?: string };
+      emailSent?: boolean;
+      notified?: boolean;
       message?: string;
     }>(`/api/projects/${projectId}/members`, {
       method: "POST",

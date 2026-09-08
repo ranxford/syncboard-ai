@@ -8,6 +8,7 @@ import { presence } from "./presence.js";
 import { calls } from "./calls.js";
 import { awareness } from "./awareness.js";
 import { activeTeammatesFor, notifyTeammates } from "./teammateNotify.js";
+import { notifySyncRoomStarted } from "./notifications.js";
 import { callRoomFor, roomFor, setIo, userRoomFor } from "./io.js";
 
 interface SocketUser {
@@ -122,6 +123,12 @@ export function initSocket(httpServer: HttpServer): Server {
         const membership = await getMembership(user.id, projectId);
         if (!membership) return ack?.({ error: "forbidden" });
 
+        const project = await prisma.project.findUnique({
+          where: { id: projectId },
+          select: { name: true },
+        });
+        const projectName = project?.name ?? "Project";
+
         const peers = calls.list(projectId).filter((p) => p.socketId !== socket.id);
         const self = {
           socketId: socket.id,
@@ -140,6 +147,7 @@ export function initSocket(httpServer: HttpServer): Server {
         let sessionId = calls.activeSession(projectId);
         let sessionNotes = "";
         let whiteboard: unknown[] = [];
+        const isNewSession = !sessionId;
         if (!sessionId) {
           const session = await prisma.syncRoomSession.create({
             data: {
@@ -198,6 +206,15 @@ export function initSocket(httpServer: HttpServer): Server {
         broadcastRoster(projectId);
         awareness.setSyncRoom(user.id, true, payload.focusTaskTitle ?? null);
         void notifyTeammates(user.id);
+        if (isNewSession) {
+          void notifySyncRoomStarted({
+            projectId,
+            projectName,
+            starterId: user.id,
+            starterName: user.name,
+            taskTitle: payload.focusTaskTitle ?? null,
+          });
+        }
         ack?.({ peers, sessionId, notes: sessionNotes, whiteboard });
       },
     );
