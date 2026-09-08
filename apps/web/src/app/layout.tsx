@@ -23,6 +23,9 @@ export const metadata: Metadata = {
   description: "Invite-only project boards with live sync and team sessions.",
 };
 
+/** Read Render env at request time — static export would bake localhost into config. */
+export const dynamic = "force-dynamic";
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   const { apiUrl, socketUrl } = getServerRuntimeConfig();
   return (
