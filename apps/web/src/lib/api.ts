@@ -9,11 +9,12 @@ import type {
   SearchResult,
   User,
 } from "./types";
+import { getApiUrl } from "./runtimeConfig";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 const TOKEN_KEY = "syncboard.token";
 
-export { API_URL };
+/** @deprecated use getApiUrl() — baked build-time URL may be stale on Render */
+export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 
 export class NetworkError extends Error {
   constructor() {
@@ -48,7 +49,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = getToken();
   let res: Response;
   try {
-    res = await fetch(`${API_URL}${path}`, {
+    res = await fetch(`${getApiUrl()}${path}`, {
       ...options,
       headers: {
         "Content-Type": "application/json",
@@ -398,7 +399,7 @@ export const api = {
     form.append("file", file);
     if (opts?.label) form.append("label", opts.label);
     if (opts?.note) form.append("note", opts.note);
-    const res = await fetch(`${API_URL}/api/projects/${projectId}/review-sources/upload`, {
+    const res = await fetch(`${getApiUrl()}/api/projects/${projectId}/review-sources/upload`, {
       method: "POST",
       headers: token ? { Authorization: `Bearer ${token}` } : {},
       body: form,
@@ -423,7 +424,7 @@ export const api = {
 
   fetchReviewSourceBlob: async (projectId: string, sourceId: string) => {
     const token = getToken();
-    const res = await fetch(`${API_URL}/api/projects/${projectId}/review-sources/${sourceId}/file`, {
+    const res = await fetch(`${getApiUrl()}/api/projects/${projectId}/review-sources/${sourceId}/file`, {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     });
     if (!res.ok) throw new ApiError("Could not load file", res.status);

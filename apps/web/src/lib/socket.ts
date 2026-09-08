@@ -1,13 +1,19 @@
 import { io, type Socket } from "socket.io-client";
 import { getToken } from "./api";
-
-const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL ?? "http://localhost:4000";
+import { getSocketUrl } from "./runtimeConfig";
 
 let socket: Socket | null = null;
+let socketUrl: string | null = null;
 
 export function getSocket(): Socket {
+  const url = getSocketUrl();
+  if (socket && socketUrl !== url) {
+    socket.disconnect();
+    socket = null;
+  }
   if (socket) return socket;
-  socket = io(SOCKET_URL, {
+  socketUrl = url;
+  socket = io(url, {
     auth: { token: getToken() },
     autoConnect: true,
     reconnection: true,
