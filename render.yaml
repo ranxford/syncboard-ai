@@ -58,10 +58,6 @@ services:
       # ── Optional (leave empty unless you add Redis later) ──
       - key: REDIS_URL
         value: ""
-    disk:
-      name: syncboard-data
-      mountPath: /app/apps/server/prisma
-      sizeGB: 1
 
   # ── Web (Next.js 15) ───────────────────────────────────────────────────────
   - type: web
