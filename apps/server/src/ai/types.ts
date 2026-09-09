@@ -101,7 +101,56 @@ export interface AiBoard {
   members: AiMember[];
 }
 
+export interface GeneratedMemberTask {
+  assigneeId: string;
+  title: string;
+  description?: string;
+  priority: "low" | "medium" | "high" | "urgent";
+}
+
+export interface TaskReviewResult {
+  passed: boolean;
+  feedback: string;
+  score: number;
+}
+
+export interface ProjectReviewAnalysis {
+  summary: string;
+  blockers: string[];
+  recommendations: string[];
+}
+
+export interface AiMemberContext {
+  id: string;
+  name: string;
+  positionLabel: string;
+  assignedRequirements: string;
+}
+
 export interface AiProvider {
   analyzeBoard(board: AiBoard): Promise<AnalyticsResult>;
   summarizeMeeting(transcript: string): Promise<MeetingResult>;
+  generateMemberTasks(input: {
+    instruction: string;
+    projectName: string;
+    projectRequirements: string;
+    members: AiMemberContext[];
+  }): Promise<GeneratedMemberTask[]>;
+  reviewTaskWork(input: {
+    taskTitle: string;
+    taskDescription: string;
+    comments: string[];
+    projectRequirements: string;
+    memberRequirements: string;
+    positionLabel: string;
+    artifactSummary: string;
+    codeExcerpt: string;
+  }): Promise<TaskReviewResult>;
+  analyzeProjectReview(input: {
+    projectName: string;
+    requirements: string;
+    reviewTasks: { title: string; assigneeName: string; description: string; reviewStatus: string }[];
+    members: AiMemberContext[];
+  }): Promise<ProjectReviewAnalysis>;
+  providerName(): string;
 }

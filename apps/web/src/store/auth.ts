@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { api, setToken, getToken, ApiError } from "@/lib/api";
-import { disconnectSocket } from "@/lib/socket";
+import { disconnectSocket, reconnectSocketWithAuth } from "@/lib/socket";
 import type { User } from "@/lib/types";
 
 interface AuthState {
@@ -29,6 +29,7 @@ export const useAuth = create<AuthState>((set) => ({
     try {
       const { user } = await api.me();
       set({ user, status: "authenticated" });
+      reconnectSocketWithAuth();
     } catch {
       setToken(null);
       set({ status: "unauthenticated", user: null });
@@ -40,6 +41,7 @@ export const useAuth = create<AuthState>((set) => ({
       const { token, user } = await api.login({ email, password });
       setToken(token);
       set({ user, status: "authenticated", pendingVerifyEmail: null });
+      reconnectSocketWithAuth();
     } catch (e) {
       if (e instanceof ApiError && e.data.needsVerification) {
         set({ pendingVerifyEmail: (e.data.email as string) || email });
@@ -61,6 +63,7 @@ export const useAuth = create<AuthState>((set) => ({
     if (res.token && res.user) {
       setToken(res.token);
       set({ user: res.user, status: "authenticated", pendingVerifyEmail: null });
+      reconnectSocketWithAuth();
       return "verified";
     }
     throw new Error("Unexpected registration response");
@@ -70,6 +73,7 @@ export const useAuth = create<AuthState>((set) => ({
     const { token: jwt, user } = await api.confirmEmail({ email, token });
     setToken(jwt);
     set({ user, status: "authenticated", pendingVerifyEmail: null });
+    reconnectSocketWithAuth();
   },
 
   resendConfirmation: async (email) => {

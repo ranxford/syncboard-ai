@@ -2,20 +2,37 @@ import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../prisma.js";
 import { requireAuth, type AuthedRequest } from "../middleware/auth.js";
-import { assertMember } from "../lib/access.js";
-import { getBoardState, parseLabels, recordActivity } from "../lib/board.js";
-import { isDoneColumn } from "../lib/columns.js";
-import { emitToProject } from "../realtime/io.js";
+import { assertMember, getMembership } from "../lib/access.js";
+import { getBoardState, parseLabels, recordActivity, broadcastBoardUpdate } from "../lib/board.js";
+import { isDoneColumn, isReviewColumn } from "../lib/columns.js";
+import { runProjectReviewAnalysis, runTaskReview } from "../lib/reviewGate.js";
+import { canCreateTaskInColumn, taskVisibleToViewer } from "../lib/taskVisibility.js";
+import { isAdminRole } from "../lib/teammates.js";
+import { syncTimelinesFromTasks } from "../lib/timelineSync.js";
+import { broadcastTimelineUpdated } from "../lib/timelineBroadcast.js";
 
 export const tasksRouter = Router();
 tasksRouter.use(requireAuth);
 
 const PRIORITIES = ["low", "medium", "high", "urgent"] as const;
 
-async function broadcast(projectId: string, userId?: string) {
-  const board = await getBoardState(projectId);
-  emitToProject(projectId, "board:updated", { board });
-  return board;
+async function broadcast(projectId: string, assigneeIds?: (string | null | undefined)[]) {
+  await syncTimelinesFromTasks(projectId, assigneeIds);
+  await broadcastTimelineUpdated(
+    projectId,
+    assigneeIds?.filter((id): id is string => !!id),
+  );
+  await broadcastBoardUpdate(projectId);
+  return getBoardState(projectId);
+}
+
+async function loadTaskForViewer(taskId: string, userId: string) {
+  const task = await prisma.task.findUnique({ where: { id: taskId } });
+  if (!task) return null;
+  const membership = await getMembership(userId, task.projectId);
+  if (!membership) return null;
+  if (!taskVisibleToViewer(task.assigneeId, userId, membership.role)) return null;
+  return { task, membership };
 }
 
 const labelsSchema = z.array(z.string().min(1).max(40)).max(20);
@@ -47,6 +64,21 @@ tasksRouter.post("/projects/:projectId/tasks", async (req: AuthedRequest, res) =
 
   const column = await prisma.column.findFirst({ where: { id: data.columnId, projectId } });
   if (!column) return res.status(404).json({ error: "Column not found" });
+  if (!canCreateTaskInColumn(column.name)) {
+    return res.status(400).json({
+      error: "New tasks can only be added in Backlog or To Do — drag cards forward from there.",
+    });
+  }
+
+  const membership = await getMembership(req.userId!, projectId);
+  let assigneeId = data.assigneeId ?? null;
+  if (!isAdminRole(membership?.role)) {
+    assigneeId = req.userId!;
+  } else if (!assigneeId) {
+    return res.status(400).json({
+      error: "Assign this task to a team member — only they and admins will see it on the board.",
+    });
+  }
 
   const count = await prisma.task.count({ where: { columnId: data.columnId } });
 
@@ -57,7 +89,7 @@ tasksRouter.post("/projects/:projectId/tasks", async (req: AuthedRequest, res) =
       title: data.title,
       description: data.description ?? "",
       priority: data.priority ?? "medium",
-      assigneeId: data.assigneeId ?? null,
+      assigneeId,
       estimateHours: data.estimateHours ?? null,
       dueDate: data.dueDate ? new Date(data.dueDate) : null,
       labels: JSON.stringify(data.labels ?? []),
@@ -74,8 +106,8 @@ tasksRouter.post("/projects/:projectId/tasks", async (req: AuthedRequest, res) =
     meta: { taskId: task.id },
   });
 
-  const board = await broadcast(projectId);
-  res.status(201).json({ task, board });
+  const board = await broadcast(projectId, [assigneeId]);
+  res.status(201).json({ task, board: await getBoardState(projectId, { viewerId: req.userId! }) });
 });
 
 const updateSchema = z.object({
@@ -90,16 +122,17 @@ const updateSchema = z.object({
 
 // PATCH /tasks/:taskId
 tasksRouter.patch("/tasks/:taskId", async (req: AuthedRequest, res) => {
-  const task = await prisma.task.findUnique({ where: { id: req.params.taskId } });
-  if (!task) return res.status(404).json({ error: "Task not found" });
-  try {
-    await assertMember(req.userId!, task.projectId);
-  } catch (e: any) {
-    return res.status(e.status ?? 403).json({ error: e.message });
-  }
+  const loaded = await loadTaskForViewer(req.params.taskId, req.userId!);
+  if (!loaded) return res.status(404).json({ error: "Task not found" });
+  const { task, membership } = loaded;
+
   const parsed = updateSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: "Invalid update" });
   const data = parsed.data;
+
+  if (data.assigneeId !== undefined && !isAdminRole(membership.role)) {
+    return res.status(403).json({ error: "Only admins can reassign tasks" });
+  }
 
   const updated = await prisma.task.update({
     where: { id: task.id },
@@ -124,8 +157,14 @@ tasksRouter.patch("/tasks/:taskId", async (req: AuthedRequest, res) => {
     meta: { taskId: task.id },
   });
 
-  const board = await broadcast(task.projectId);
-  res.json({ task: updated, board });
+  await broadcast(task.projectId, [
+    task.assigneeId,
+    data.assigneeId !== undefined ? data.assigneeId : task.assigneeId,
+  ]);
+  res.json({
+    task: updated,
+    board: await getBoardState(task.projectId, { viewerId: req.userId! }),
+  });
 });
 
 const moveSchema = z.object({
@@ -135,13 +174,9 @@ const moveSchema = z.object({
 
 // POST /tasks/:taskId/move
 tasksRouter.post("/tasks/:taskId/move", async (req: AuthedRequest, res) => {
-  const task = await prisma.task.findUnique({ where: { id: req.params.taskId } });
-  if (!task) return res.status(404).json({ error: "Task not found" });
-  try {
-    await assertMember(req.userId!, task.projectId);
-  } catch (e: any) {
-    return res.status(e.status ?? 403).json({ error: e.message });
-  }
+  const loaded = await loadTaskForViewer(req.params.taskId, req.userId!);
+  if (!loaded) return res.status(404).json({ error: "Task not found" });
+  const { task } = loaded;
   const parsed = moveSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: "Invalid move" });
   const { columnId, index } = parsed.data;
@@ -150,6 +185,25 @@ tasksRouter.post("/tasks/:taskId/move", async (req: AuthedRequest, res) => {
     where: { id: columnId, projectId: task.projectId },
   });
   if (!targetColumn) return res.status(404).json({ error: "Target column not found" });
+
+  const membership = await getMembership(req.userId!, task.projectId);
+  const movingToDone = await isDoneColumn(task.projectId, columnId);
+  const movingToReview = await isReviewColumn(task.projectId, columnId);
+
+  if (movingToDone && !task.reviewOverride && task.reviewStatus !== "passed") {
+    if (!isAdminRole(membership?.role)) {
+      return res.status(403).json({
+        error:
+          "DeepSeek review must pass before moving to Done. Move the task to Review and wait for approval.",
+        reviewStatus: task.reviewStatus,
+      });
+    }
+    return res.status(403).json({
+      error:
+        "Task has not passed DeepSeek review. Use Admin Override in the task panel, or move back to Review.",
+      reviewStatus: task.reviewStatus,
+    });
+  }
 
   const columnChanged = task.columnId !== columnId;
 
@@ -178,6 +232,12 @@ tasksRouter.post("/tasks/:taskId/move", async (req: AuthedRequest, res) => {
         columnId,
         ...(columnChanged ? { enteredColumnAt: new Date() } : {}),
         completedAt: nowDone ? task.completedAt ?? new Date() : null,
+        ...(columnChanged && movingToReview
+          ? { reviewStatus: "pending", reviewFeedback: "Queued for DeepSeek review…", reviewOverride: false }
+          : {}),
+        ...(columnChanged && !movingToReview && !movingToDone && task.reviewStatus !== "none"
+          ? { reviewStatus: "none", reviewFeedback: "", reviewOverride: false }
+          : {}),
       },
     }),
   ]);
@@ -201,8 +261,53 @@ tasksRouter.post("/tasks/:taskId/move", async (req: AuthedRequest, res) => {
     meta: { taskId: task.id, columnId },
   });
 
-  const board = await broadcast(task.projectId);
-  res.json({ board });
+  await broadcast(task.projectId, [task.assigneeId]);
+
+  if (columnChanged && movingToReview) {
+    void runTaskReview(task.id).then(() => runProjectReviewAnalysis(task.projectId));
+  }
+
+  res.json({ board: await getBoardState(task.projectId, { viewerId: req.userId! }) });
+});
+
+// POST /tasks/:taskId/review — re-run DeepSeek review (member or admin)
+tasksRouter.post("/tasks/:taskId/review", async (req: AuthedRequest, res) => {
+  const loaded = await loadTaskForViewer(req.params.taskId, req.userId!);
+  if (!loaded) return res.status(404).json({ error: "Task not found" });
+
+  await runTaskReview(loaded.task.id);
+  await runProjectReviewAnalysis(loaded.task.projectId);
+  res.json({ board: await getBoardState(loaded.task.projectId, { viewerId: req.userId! }) });
+});
+
+// POST /tasks/:taskId/review-override — admin bypass review gate
+tasksRouter.post("/tasks/:taskId/review-override", async (req: AuthedRequest, res) => {
+  const loaded = await loadTaskForViewer(req.params.taskId, req.userId!);
+  if (!loaded) return res.status(404).json({ error: "Task not found" });
+  if (!isAdminRole(loaded.membership.role)) {
+    return res.status(403).json({ error: "Only admins can override DeepSeek review." });
+  }
+
+  const updated = await prisma.task.update({
+    where: { id: loaded.task.id },
+    data: {
+      reviewOverride: true,
+      reviewStatus: "passed",
+      reviewFeedback: "Admin override — review gate bypassed.",
+      reviewCheckedAt: new Date(),
+    },
+  });
+
+  await recordActivity({
+    projectId: loaded.task.projectId,
+    userId: req.userId,
+    type: "ai.insight",
+    message: `admin override for DeepSeek review on "${updated.title}"`,
+    meta: { taskId: updated.id },
+  });
+
+  await broadcast(loaded.task.projectId, [loaded.task.assigneeId]);
+  res.json({ task: updated, board: await getBoardState(loaded.task.projectId, { viewerId: req.userId! }) });
 });
 
 // GET /projects/:projectId/tasks/search?q=
@@ -215,6 +320,8 @@ tasksRouter.get("/projects/:projectId/tasks/search", async (req: AuthedRequest, 
   }
   const q = String(req.query.q ?? "").trim();
   if (!q) return res.json({ results: [] });
+
+  const membership = await getMembership(req.userId!, projectId);
 
   const tasks = await prisma.task.findMany({
     where: {
@@ -233,8 +340,12 @@ tasksRouter.get("/projects/:projectId/tasks/search", async (req: AuthedRequest, 
     },
   });
 
+  const visible = tasks.filter((t) =>
+    taskVisibleToViewer(t.assigneeId, req.userId!, membership?.role),
+  );
+
   res.json({
-    results: tasks.map((t) => ({
+    results: visible.map((t) => ({
       id: t.id,
       title: t.title,
       priority: t.priority,
@@ -278,13 +389,9 @@ tasksRouter.get("/me/tasks", async (req: AuthedRequest, res) => {
 
 // DELETE /tasks/:taskId
 tasksRouter.delete("/tasks/:taskId", async (req: AuthedRequest, res) => {
-  const task = await prisma.task.findUnique({ where: { id: req.params.taskId } });
-  if (!task) return res.status(404).json({ error: "Task not found" });
-  try {
-    await assertMember(req.userId!, task.projectId);
-  } catch (e: any) {
-    return res.status(e.status ?? 403).json({ error: e.message });
-  }
+  const loaded = await loadTaskForViewer(req.params.taskId, req.userId!);
+  if (!loaded) return res.status(404).json({ error: "Task not found" });
+  const { task } = loaded;
 
   await prisma.task.delete({ where: { id: task.id } });
   await recordActivity({
@@ -294,6 +401,6 @@ tasksRouter.delete("/tasks/:taskId", async (req: AuthedRequest, res) => {
     message: `deleted task "${task.title}"`,
   });
 
-  const board = await broadcast(task.projectId);
-  res.json({ board });
+  await broadcast(task.projectId, [task.assigneeId]);
+  res.json({ board: await getBoardState(task.projectId, { viewerId: req.userId! }) });
 });

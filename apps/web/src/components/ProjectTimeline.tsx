@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { CheckCircle2, ChevronDown, ChevronUp, Circle, Flag, Plus, Share2, Users } from "lucide-react";
 import { api } from "@/lib/api";
+import { getSocket } from "@/lib/socket";
 import type { Milestone, MemberTimeline } from "@/lib/types";
 import { positionBadgeClass } from "@/lib/alignmentPositions";
 import { useAuth } from "@/store/auth";
@@ -42,6 +43,23 @@ export function ProjectTimeline({ projectId }: { projectId: string }) {
 
   useEffect(() => {
     void load().catch(() => {});
+
+    const onTimelineUpdated = (e: Event) => {
+      const detail = (e as CustomEvent<{ projectId: string }>).detail;
+      if (detail?.projectId === projectId) void load().catch(() => {});
+    };
+    window.addEventListener("syncboard:timeline-updated", onTimelineUpdated);
+
+    const socket = getSocket();
+    const onSocketTimeline = (payload: { projectId: string }) => {
+      if (payload.projectId === projectId) void load().catch(() => {});
+    };
+    socket.on("timeline:updated", onSocketTimeline);
+
+    return () => {
+      window.removeEventListener("syncboard:timeline-updated", onTimelineUpdated);
+      socket.off("timeline:updated", onSocketTimeline);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId]);
 
@@ -213,9 +231,9 @@ export function ProjectTimeline({ projectId }: { projectId: string }) {
 
       <p className="mb-2 text-[11px] text-gray-500">
         {tab === "community"
-          ? "Everyone in the community can see this track. Share personal work here when you’re ready."
+          ? "Everyone in the community can see this track. Progress syncs automatically as tasks move on the board."
           : activeMember?.isMe
-            ? `Your private ${activeMember.positionLabel || "personal"} timeline — analyzer scores this track separately from other roles.`
+            ? `Your private ${activeMember.positionLabel || "personal"} timeline — progress syncs from tasks assigned to you. Only you and admins can see this.`
             : canManageCommunity
               ? `Admin view: ${activeMember?.name}'s ${activeMember?.positionLabel || "personal"} timeline (scored separately).`
               : "Collaborator timeline."}

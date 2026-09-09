@@ -70,6 +70,7 @@ const ctx: {
   otherToken?: string;
   projectId?: string;
   todoColumnId?: string;
+  reviewColumnId?: string;
   doneColumnId?: string;
   taskId?: string;
 } = {};
@@ -105,6 +106,9 @@ test("create a project and read its default columns", async () => {
   const todo = board.columns.find((c: any) => c.name === "To Do");
   assert.ok(todo, "expected a To Do column");
   ctx.todoColumnId = todo.id;
+  const review = board.columns.find((c: any) => c.name === "Review");
+  assert.ok(review, "expected a Review column");
+  ctx.reviewColumnId = review.id;
   const done = board.columns.find((c: any) => c.name === "Done");
   assert.ok(done, "expected a Done column");
   ctx.doneColumnId = done.id;
@@ -246,7 +250,45 @@ test("health check reports db connectivity", async () => {
   assert.equal(res.body.db, "ok");
 });
 
-test("moving a task to Done marks it completed and drops it from assigned-to-me", async () => {
+test("cannot move directly to Done without DeepSeek review", async () => {
+  const blocked = await api(`/api/tasks/${ctx.taskId}/move`, {
+    method: "POST",
+    token: ctx.token,
+    body: { columnId: ctx.doneColumnId, index: 0 },
+  });
+  assert.equal(blocked.status, 403);
+});
+
+test("moving through Review and passing gate completes the task", async () => {
+  const toReview = await api(`/api/tasks/${ctx.taskId}/move`, {
+    method: "POST",
+    token: ctx.token,
+    body: { columnId: ctx.reviewColumnId, index: 0 },
+  });
+  assert.equal(toReview.status, 200);
+
+  const reviewed = await api(`/api/tasks/${ctx.taskId}/review`, {
+    method: "POST",
+    token: ctx.token,
+  });
+  assert.equal(reviewed.status, 200);
+
+  const taskAfterReview = reviewed.body.board.columns
+    .flatMap((c: any) => c.tasks)
+    .find((t: any) => t.id === ctx.taskId);
+  assert.ok(
+    taskAfterReview.reviewStatus === "passed" || taskAfterReview.reviewStatus === "failed",
+    "review should complete",
+  );
+
+  if (taskAfterReview.reviewStatus !== "passed") {
+    const override = await api(`/api/tasks/${ctx.taskId}/review-override`, {
+      method: "POST",
+      token: ctx.token,
+    });
+    assert.equal(override.status, 200);
+  }
+
   const moved = await api(`/api/tasks/${ctx.taskId}/move`, {
     method: "POST",
     token: ctx.token,

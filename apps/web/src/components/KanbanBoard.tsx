@@ -9,6 +9,7 @@ import { useBoardZoom } from "@/store/boardZoom";
 import { useAuth } from "@/store/auth";
 import type { PresenceUser, Task } from "@/lib/types";
 import { SOFTWARE_ONLY_LABELS, fieldLabel, suggestedLabelsForField } from "@/lib/projectFields";
+import { canCreateTaskInColumn, isReviewColumn } from "@/lib/columns";
 import { BoardColumn } from "./BoardColumn";
 import { BoardZoomControls } from "./BoardZoomControls";
 import {
@@ -23,9 +24,11 @@ import {
 export function KanbanBoard({
   onEditTask,
   onAddTask,
+  isAdmin = false,
 }: {
   onEditTask: (task: Task) => void;
   onAddTask: (columnId: string) => void;
+  isAdmin?: boolean;
 }) {
   const board = useBoard((s) => s.board);
   const presence = useBoard((s) => s.presence);
@@ -190,6 +193,12 @@ export function KanbanBoard({
 
   return (
     <div className="relative flex h-full flex-col overflow-hidden">
+      <div className="flex items-center justify-between border-b border-white/[0.06] px-4 py-2 md:px-6">
+        <p className="text-xs text-gray-500">
+          Board workflow — work flows forward; <span className="text-violet-300">Review</span> is the
+          DeepSeek gate before Done.
+        </p>
+      </div>
       <BoardFilters
         allLabels={allLabels}
         suggestedLabels={suggestedLabels}
@@ -217,6 +226,11 @@ export function KanbanBoard({
                 key={column.id}
                 column={column}
                 done={doneColumnIds.has(column.id)}
+                review={isReviewColumn(column.name)}
+                projectId={board.project.id}
+                projectRequirements={board.project.requirements ?? ""}
+                reviewAnalysisRaw={board.project.reviewAnalysis}
+                isAdmin={isAdmin}
                 visibleTasks={
                   filtering ? column.tasks.filter((t) => matchesFilters(t, column.id)) : column.tasks
                 }
@@ -225,6 +239,7 @@ export function KanbanBoard({
                 draggingId={draggingId}
                 onCardClick={onEditTask}
                 onAddTask={onAddTask}
+                canAddTask={canCreateTaskInColumn(column.name)}
                 onDragStart={handleDragStart}
                 onDragEnd={handleDragEnd}
                 onDropBeforeTask={handleDropBeforeTask}

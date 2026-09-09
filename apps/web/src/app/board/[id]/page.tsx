@@ -34,6 +34,10 @@ import { SyncRoomBoardTracker } from "@/components/syncroom/SyncRoomBoardTracker
 import { SyncRoomProjectHint } from "@/components/syncroom/SyncRoomProjectHint";
 import { SyncRoomWrapUp } from "@/components/syncroom/SyncRoomWrapUp";
 import { BoardToolsMenu } from "@/components/BoardToolsMenu";
+import { DeepSeekBadge } from "@/components/DeepSeekBadge";
+import { AskDeepSeekPanel } from "@/components/AskDeepSeekPanel";
+import { api } from "@/lib/api";
+import type { AiProviderInfo } from "@/lib/types";
 import { fieldLabel } from "@/lib/projectFields";
 import { useTeammateAwareness } from "@/lib/useTeammateAwareness";
 
@@ -62,6 +66,8 @@ function BoardInner({ projectId }: { projectId: string }) {
   const [deliverablesOpen, setDeliverablesOpen] = useState(false);
   const [fieldPickerOpen, setFieldPickerOpen] = useState(false);
   const [activityKey, setActivityKey] = useState(0);
+  const [askDeepSeekOpen, setAskDeepSeekOpen] = useState(false);
+  const [aiInfo, setAiInfo] = useState<AiProviderInfo | null>(null);
 
   const user = useAuth((s) => s.user);
   const myRole = board?.members.find((m) => m.id === user?.id)?.role;
@@ -77,6 +83,10 @@ function BoardInner({ projectId }: { projectId: string }) {
 
   // Cross-project alerts when a shared teammate starts a SyncRoom elsewhere.
   useTeammateAwareness(undefined, { notifySyncRoom: true });
+
+  useEffect(() => {
+    void api.getAiProvider().then(setAiInfo).catch(() => {});
+  }, []);
 
   useEffect(() => {
     init(projectId);
@@ -167,6 +177,7 @@ function BoardInner({ projectId }: { projectId: string }) {
           {board?.project.field && (
             <span className="pill hidden lg:inline">{fieldLabel(board.project.field)}</span>
           )}
+          <DeepSeekBadge info={aiInfo} />
           <ConnectivityBadge />
         </div>
       </Navbar>
@@ -195,6 +206,16 @@ function BoardInner({ projectId }: { projectId: string }) {
         <div className="hidden md:block" aria-hidden />
         <div className="flex min-w-0 flex-1 items-center justify-end gap-1.5 sm:gap-2">
           <SyncRoomQuickControls />
+          {isProjectAdmin && (
+            <button
+              type="button"
+              onClick={() => setAskDeepSeekOpen(true)}
+              className="btn-ghost hidden border-violet-500/30 text-violet-200 sm:inline-flex"
+              title="Ask DeepSeek to create tasks for all members"
+            >
+              Ask DeepSeek
+            </button>
+          )}
           {board && (
             <BoardSearch
               projectId={projectId}
@@ -287,6 +308,7 @@ function BoardInner({ projectId }: { projectId: string }) {
             </div>
           ) : (
             <KanbanBoard
+              isAdmin={isProjectAdmin}
               onEditTask={(t) => setEditing(t)}
               onAddTask={(columnId) => setAddingColumnId(columnId)}
             />
@@ -360,6 +382,14 @@ function BoardInner({ projectId }: { projectId: string }) {
           isMember={myRole === "member"}
         />
       )}
+
+      <AskDeepSeekPanel
+        projectId={projectId}
+        open={askDeepSeekOpen}
+        onClose={() => setAskDeepSeekOpen(false)}
+        aiInfo={aiInfo}
+        isAdmin={isProjectAdmin}
+      />
 
       <SyncRoomWrapUp
         open={wrapUpOpen}

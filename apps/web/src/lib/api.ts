@@ -455,6 +455,31 @@ export const api = {
       body: JSON.stringify({ columnId, items }),
     }),
 
+  getAiProvider: () =>
+    request<import("./types").AiProviderInfo>("/api/ai/provider"),
+
+  generateTasks: (
+    projectId: string,
+    data: { instruction: string; columnId: string },
+  ) =>
+    request<{
+      provider: string;
+      created: number;
+      board: Board;
+    }>(`/api/projects/${projectId}/ai/generate-tasks`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  runTaskReview: (taskId: string) =>
+    request<{ board: Board }>(`/api/tasks/${taskId}/review`, { method: "POST", body: "{}" }),
+
+  overrideTaskReview: (taskId: string) =>
+    request<{ board: Board }>(`/api/tasks/${taskId}/review-override`, {
+      method: "POST",
+      body: "{}",
+    }),
+
   dashboard: () =>
     request<{ projects: import("./types").ProjectSummary[]; teammates: import("./types").TeammateStatus[] }>(
       "/api/dashboard",

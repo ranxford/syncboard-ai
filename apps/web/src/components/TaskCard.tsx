@@ -1,7 +1,7 @@
 "use client";
 
 import { type DragEvent } from "react";
-import { Calendar, CheckCircle2, Clock } from "lucide-react";
+import { Calendar, CheckCircle2, Clock, Loader2, ShieldAlert, ShieldCheck } from "lucide-react";
 import type { PresenceUser, Task } from "@/lib/types";
 import { PRIORITY_STYLES, dueLabel } from "@/lib/ui";
 import { Avatar } from "./Avatar";
@@ -9,6 +9,7 @@ import { Avatar } from "./Avatar";
 export function TaskCard({
   task,
   done = false,
+  inReview = false,
   watchers,
   onClick,
   onDragStart,
@@ -17,6 +18,7 @@ export function TaskCard({
 }: {
   task: Task;
   done?: boolean;
+  inReview?: boolean;
   watchers: PresenceUser[];
   onClick: () => void;
   onDragStart: (e: DragEvent) => void;
@@ -35,7 +37,15 @@ export function TaskCard({
       onClick={onClick}
       className={`task-card group relative ${othersWatching ? "border-brand-400/30" : ""} ${
         dragging ? "opacity-45" : ""
-      } ${done ? "opacity-75" : ""}`}
+      } ${done ? "opacity-75" : ""} ${
+        inReview && task.reviewStatus === "failed"
+          ? "border-red-500/30"
+          : inReview && task.reviewStatus === "passed"
+            ? "border-emerald-500/25"
+            : inReview
+              ? "border-violet-500/20"
+              : ""
+      }`}
     >
       {othersWatching && (
         <div className="absolute -right-1 -top-1 flex -space-x-1">
@@ -92,6 +102,29 @@ export function TaskCard({
           <span className="inline-flex items-center gap-1 text-gray-500">
             <Clock className="h-3 w-3" />
             {task.estimateHours}h
+          </span>
+        )}
+        {inReview && task.reviewStatus && task.reviewStatus !== "none" && (
+          <span
+            className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 font-medium ${
+              task.reviewStatus === "passed"
+                ? "bg-emerald-500/12 text-emerald-300"
+                : task.reviewStatus === "failed"
+                  ? "bg-red-500/12 text-red-300"
+                  : task.reviewStatus === "pending"
+                    ? "bg-violet-500/12 text-violet-300"
+                    : "text-gray-500"
+            }`}
+            title={task.reviewFeedback ?? undefined}
+          >
+            {task.reviewStatus === "pending" ? (
+              <Loader2 className="h-3 w-3 animate-spin" />
+            ) : task.reviewStatus === "passed" ? (
+              <ShieldCheck className="h-3 w-3" />
+            ) : task.reviewStatus === "failed" ? (
+              <ShieldAlert className="h-3 w-3" />
+            ) : null}
+            DeepSeek {task.reviewStatus}
           </span>
         )}
       </div>

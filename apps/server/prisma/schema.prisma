@@ -45,6 +45,9 @@ model Project {
   description String   @default("")
   // Manager / admin brief — collaborators should align open work to this
   requirements String  @default("")
+  // DeepSeek project analyzer output when tasks enter Review
+  reviewAnalysis   String   @default("")
+  reviewAnalysisAt DateTime?
   // visibility: "personal" | "shared"
   visibility  String   @default("shared")
   // field: industry / domain of work (general, business, mining, …)
@@ -237,6 +240,11 @@ model Task {
   // when the task entered its current column (for stagnation detection)
   enteredColumnAt DateTime @default(now())
   completedAt   DateTime?
+  // DeepSeek review gate — none | pending | passed | failed
+  reviewStatus    String    @default("none")
+  reviewFeedback  String    @default("")
+  reviewCheckedAt DateTime?
+  reviewOverride  Boolean   @default(false)
 
   project  Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
   column   Column  @relation(fields: [columnId], references: [id], onDelete: Cascade)

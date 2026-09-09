@@ -16,6 +16,7 @@ import { milestonesRouter } from "./routes/milestones.js";
 import { ideasRouter } from "./routes/ideas.js";
 import { submissionsRouter } from "./routes/submissions.js";
 import { reviewSourcesRouter } from "./routes/reviewSources.js";
+import { alignmentRouter } from "./routes/alignment.js";
 
 /** Build the Express app (no socket server, no listen) so it can be reused by tests. */
 export function createApp() {
@@ -45,6 +46,7 @@ export function createApp() {
       status: healthy ? "ok" : "degraded",
       db,
       ai: env.ai.provider,
+      aiModel: env.ai.provider === "deepseek" ? env.ai.deepseekModel : env.ai.openaiModel,
       time: new Date().toISOString(),
     });
   });
@@ -89,6 +91,7 @@ export function createApp() {
   app.use("/api", ideasRouter);
   app.use("/api", submissionsRouter);
   app.use("/api", reviewSourcesRouter);
+  app.use("/api", alignmentRouter);
 
   // Centralized error fallback
   app.use(

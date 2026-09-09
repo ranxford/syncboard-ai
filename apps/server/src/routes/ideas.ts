@@ -3,8 +3,7 @@ import { z } from "zod";
 import { prisma } from "../prisma.js";
 import { requireAuth, type AuthedRequest } from "../middleware/auth.js";
 import { assertMember } from "../lib/access.js";
-import { getBoardState, recordActivity } from "../lib/board.js";
-import { emitToProject } from "../realtime/io.js";
+import { getBoardState, recordActivity, broadcastBoardUpdate } from "../lib/board.js";
 import { serializeLabels } from "../lib/labels.js";
 
 export const ideasRouter = Router();
@@ -177,6 +176,7 @@ ideasRouter.post("/ideas/:id/promote", async (req: AuthedRequest, res) => {
       labels: serializeLabels(["idea"]),
       order: (maxOrder._max.order ?? -1) + 1,
       priority: "medium",
+      assigneeId: req.userId!,
     },
   });
 
@@ -192,11 +192,13 @@ ideasRouter.post("/ideas/:id/promote", async (req: AuthedRequest, res) => {
     message: `promoted idea “${idea.title}” to the board`,
   });
 
-  const board = await getBoardState(idea.projectId);
-  emitToProject(idea.projectId, "board:updated", { board });
+  await broadcastBoardUpdate(idea.projectId);
 
   const full = await serializeIdea(idea.id, req.userId!);
-  res.json({ idea: full, board });
+  res.json({
+    idea: full,
+    board: await getBoardState(idea.projectId, { viewerId: req.userId! }),
+  });
 });
 
 ideasRouter.delete("/ideas/:id", async (req: AuthedRequest, res) => {

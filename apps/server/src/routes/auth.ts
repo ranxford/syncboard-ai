@@ -6,6 +6,7 @@ import { prisma } from "../prisma.js";
 import { signToken } from "../lib/jwt.js";
 import { requireAuth, type AuthedRequest } from "../middleware/auth.js";
 import { ensurePersonalTimeline } from "../lib/timelines.js";
+import { notifyProjectAdded } from "../realtime/notifications.js";
 import { env } from "../env.js";
 import { sendVerificationEmail, EmailNotConfiguredError, EmailDeliveryError } from "../lib/email.js";
 
@@ -75,6 +76,10 @@ async function acceptPendingInvites(userId: string, email: string) {
       status: "pending",
       expiresAt: { gt: new Date() },
     },
+    include: {
+      project: { select: { id: true, name: true } },
+      invitedBy: { select: { name: true } },
+    },
   });
   for (const inv of invites) {
     const existing = await prisma.membership.findUnique({
@@ -85,6 +90,12 @@ async function acceptPendingInvites(userId: string, email: string) {
         data: { userId, projectId: inv.projectId, role: inv.role },
       });
       await ensurePersonalTimeline(inv.projectId, userId);
+      await notifyProjectAdded({
+        userId,
+        projectId: inv.project.id,
+        projectName: inv.project.name,
+        inviterName: inv.invitedBy.name,
+      });
     }
     await prisma.projectInvite.update({
       where: { id: inv.id },

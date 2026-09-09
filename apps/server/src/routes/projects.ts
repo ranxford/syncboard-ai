@@ -4,8 +4,7 @@ import { z } from "zod";
 import { prisma } from "../prisma.js";
 import { requireAuth, type AuthedRequest } from "../middleware/auth.js";
 import { assertCanManageTeam, assertMember, assertOwner, getMembership } from "../lib/access.js";
-import { activityVisibleToViewer, getBoardState, recordActivity } from "../lib/board.js";
-import { emitToProject } from "../realtime/io.js";
+import { activityVisibleToViewer, getBoardState, recordActivity, broadcastBoardUpdate } from "../lib/board.js";
 import { notifyProjectAdded } from "../realtime/notifications.js";
 import { sendProjectInviteEmail } from "../lib/email.js";
 import { COMMUNITY_MILESTONES, ensurePersonalTimeline } from "../lib/timelines.js";
@@ -98,7 +97,7 @@ projectsRouter.get("/:id", async (req: AuthedRequest, res) => {
   } catch (e: any) {
     return res.status(e.status ?? 403).json({ error: e.message });
   }
-  const board = await getBoardState(req.params.id);
+  const board = await getBoardState(req.params.id, { viewerId: req.userId! });
   if (!board) return res.status(404).json({ error: "Project not found" });
   res.json({ board });
 });
@@ -137,8 +136,8 @@ projectsRouter.patch("/:id", async (req: AuthedRequest, res) => {
     data: parsed.data,
   });
 
-  const board = await getBoardState(req.params.id);
-  emitToProject(req.params.id, "board:updated", { board });
+  await broadcastBoardUpdate(req.params.id);
+  const board = await getBoardState(req.params.id, { viewerId: req.userId! });
   res.json({ board });
 });
 
@@ -275,15 +274,18 @@ projectsRouter.post("/:id/members", async (req: AuthedRequest, res) => {
       message: `${user.name} joined the community`,
     });
 
-    const board = await getBoardState(req.params.id);
-    emitToProject(req.params.id, "board:updated", { board });
-    notifyProjectAdded({
+    await broadcastBoardUpdate(req.params.id);
+    await notifyProjectAdded({
       userId: user.id,
       projectId: project.id,
       projectName: project.name,
       inviterName,
     });
-    return res.status(201).json({ board, invited: { email, status: "joined" }, notified: true });
+    return res.status(201).json({
+      board: await getBoardState(req.params.id, { viewerId: req.userId! }),
+      invited: { email, status: "joined" },
+      notified: true,
+    });
   }
 
   const pending = await prisma.projectInvite.findFirst({
@@ -378,8 +380,8 @@ projectsRouter.delete("/:id/members/:userId", async (req: AuthedRequest, res) =>
     message: `removed ${target.user.name} from the project`,
   });
 
-  const board = await getBoardState(req.params.id);
-  emitToProject(req.params.id, "board:updated", { board });
+  await broadcastBoardUpdate(req.params.id);
+  const board = await getBoardState(req.params.id, { viewerId: req.userId! });
   res.json({ board });
 });
 

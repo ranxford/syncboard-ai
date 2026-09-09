@@ -2,12 +2,18 @@ import { emitToProject, emitToUser } from "../realtime/io.js";
 import { prisma } from "../prisma.js";
 import { parseLabels } from "./labels.js";
 import { isAdminRole } from "./teammates.js";
+import { taskVisibleToViewer } from "./taskVisibility.js";
 
 export { parseLabels } from "./labels.js";
 
+export type BoardState = NonNullable<Awaited<ReturnType<typeof getBoardState>>>;
+
 /** Full board state for a project: members, columns (ordered) and their tasks (ordered). */
-export async function getBoardState(projectId: string) {
-  const [project, columns, members] = await Promise.all([
+export async function getBoardState(
+  projectId: string,
+  opts?: { viewerId?: string },
+) {
+  const [project, columns, memberships] = await Promise.all([
     prisma.project.findUnique({ where: { id: projectId } }),
     prisma.column.findMany({
       where: { projectId },
@@ -29,6 +35,12 @@ export async function getBoardState(projectId: string) {
 
   if (!project) return null;
 
+  const viewerMembership = opts?.viewerId
+    ? memberships.find((m) => m.userId === opts.viewerId)
+    : undefined;
+  const viewerRole = viewerMembership?.role;
+  const filterForMember = opts?.viewerId && !isAdminRole(viewerRole);
+
   return {
     project: {
       id: project.id,
@@ -39,19 +51,46 @@ export async function getBoardState(projectId: string) {
       visibility: project.visibility,
       field: project.field,
       requirements: project.requirements,
+      reviewAnalysis: project.reviewAnalysis,
+      reviewAnalysisAt: project.reviewAnalysisAt,
     },
-    members: members.map((m) => ({
+    members: memberships.map((m) => ({
       id: m.user.id,
       name: m.user.name,
       email: m.user.email,
       avatarColor: m.user.avatarColor,
       role: m.role,
+      positionKey: m.positionKey,
+      positionLabel: m.positionLabel,
+      assignedRequirements: m.assignedRequirements,
     })),
     columns: columns.map((c) => ({
       ...c,
-      tasks: c.tasks.map((t) => ({ ...t, labels: parseLabels(t.labels) })),
+      tasks: c.tasks
+        .filter((t) =>
+          filterForMember
+            ? taskVisibleToViewer(t.assigneeId, opts!.viewerId!, viewerRole)
+            : true,
+        )
+        .map((t) => ({ ...t, labels: parseLabels(t.labels) })),
     })),
   };
+}
+
+/** Push a per-user filtered board snapshot after mutations (members don't see peers' assigned tasks). */
+export async function broadcastBoardUpdate(projectId: string) {
+  const members = await prisma.membership.findMany({
+    where: { projectId },
+    select: { userId: true },
+  });
+  await Promise.all(
+    members.map(async (m) => {
+      const board = await getBoardState(projectId, { viewerId: m.userId });
+      if (board) {
+        emitToUser(m.userId, "board:updated", { projectId, board });
+      }
+    }),
+  );
 }
 
 export async function recordActivity(params: {

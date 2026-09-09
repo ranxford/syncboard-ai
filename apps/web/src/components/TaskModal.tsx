@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Send, Trash2, Video, X, Radio } from "lucide-react";
+import { Loader2, Send, ShieldCheck, Sparkles, Trash2, Video, X, Radio } from "lucide-react";
 import { CommentBody } from "@/components/CommentBody";
 import { getSocket } from "@/lib/socket";
 import { api } from "@/lib/api";
@@ -12,6 +12,7 @@ import { useEscape } from "@/lib/useEscape";
 import { relativeTime } from "@/lib/ui";
 import type { Comment, Member, Priority, SyncRoomSessionSummary, Task } from "@/lib/types";
 import { suggestedLabelsForField } from "@/lib/projectFields";
+import { toast } from "@/store/toast";
 import { Avatar } from "./Avatar";
 import { SyncRoomPresencePrompt } from "./syncroom/SyncRoomPresencePrompt";
 import { useSyncRoom } from "@/store/call";
@@ -40,18 +41,23 @@ export function TaskModal({
 }) {
   const { createTask, updateTask, deleteTask, board } = useBoard();
   const currentUser = useAuth((s) => s.user);
-  const isEdit = !!task;
+  const myRole = board?.members.find((m) => m.id === currentUser?.id)?.role;
+  const isProjectAdmin = myRole === "owner" || myRole === "admin";
   const fieldSuggestions = suggestedLabelsForField(board?.project.field);
 
   const [title, setTitle] = useState(task?.title ?? "");
   const [description, setDescription] = useState(task?.description ?? "");
   const [priority, setPriority] = useState<Priority>(task?.priority ?? "medium");
-  const [assigneeId, setAssigneeId] = useState<string>(task?.assigneeId ?? "");
+  const [assigneeId, setAssigneeId] = useState<string>(
+    task?.assigneeId ?? (isProjectAdmin ? "" : currentUser?.id ?? ""),
+  );
   const [estimate, setEstimate] = useState<string>(task?.estimateHours?.toString() ?? "");
   const [dueDate, setDueDate] = useState<string>(toDateInput(task?.dueDate ?? null));
   const [labels, setLabels] = useState<string[]>(task?.labels ?? []);
   const [labelInput, setLabelInput] = useState("");
   const [busy, setBusy] = useState(false);
+  const [reviewBusy, setReviewBusy] = useState(false);
+  const applyServerBoard = useBoard((s) => s.applyServerBoard);
 
   const [comments, setComments] = useState<Comment[]>([]);
   const [commentBody, setCommentBody] = useState("");
@@ -111,9 +117,15 @@ export function TaskModal({
     }
   }
 
+  const isEdit = !!task;
+
   async function save(e: React.FormEvent) {
     e.preventDefault();
     if (!title.trim()) return;
+    if (!isEdit && isProjectAdmin && !assigneeId) {
+      toast.error("Choose who this task is for — only that person and admins will see it.");
+      return;
+    }
     setBusy(true);
     const payload = {
       title: title.trim(),
@@ -179,6 +191,65 @@ export function TaskModal({
             >
               <Video className="h-4 w-4" /> Live discussion (SyncRoom)
             </button>
+
+            {(task.reviewStatus && task.reviewStatus !== "none") || task.reviewOverride ? (
+              <div
+                className={`mb-4 rounded-xl border p-3 text-xs ${
+                  task.reviewStatus === "passed" || task.reviewOverride
+                    ? "border-emerald-500/25 bg-emerald-500/5"
+                    : task.reviewStatus === "failed"
+                      ? "border-red-500/25 bg-red-500/5"
+                      : "border-violet-500/25 bg-violet-500/5"
+                }`}
+              >
+                <h3 className="mb-1 flex items-center gap-1.5 font-semibold text-violet-200">
+                  <Sparkles className="h-3.5 w-3.5" /> DeepSeek Review
+                </h3>
+                <p className="text-gray-300">{task.reviewFeedback || "No feedback yet."}</p>
+                {task.reviewStatus === "failed" && (
+                  <button
+                    type="button"
+                    disabled={reviewBusy}
+                    onClick={async () => {
+                      setReviewBusy(true);
+                      try {
+                        const { board: next } = await api.runTaskReview(task.id);
+                        applyServerBoard(next);
+                        toast.success("DeepSeek re-review queued.");
+                      } catch (err: unknown) {
+                        toast.error(err instanceof Error ? err.message : "Review failed.");
+                      } finally {
+                        setReviewBusy(false);
+                      }
+                    }}
+                    className="btn-ghost mt-2 text-[11px]"
+                  >
+                    {reviewBusy ? <Loader2 className="h-3 w-3 animate-spin" /> : "Re-run review"}
+                  </button>
+                )}
+                {isProjectAdmin && task.reviewStatus !== "passed" && !task.reviewOverride && (
+                  <button
+                    type="button"
+                    disabled={reviewBusy}
+                    onClick={async () => {
+                      setReviewBusy(true);
+                      try {
+                        const { board: next } = await api.overrideTaskReview(task.id);
+                        applyServerBoard(next);
+                        toast.success("Admin override — task can move to Done.");
+                      } catch (err: unknown) {
+                        toast.error(err instanceof Error ? err.message : "Override failed.");
+                      } finally {
+                        setReviewBusy(false);
+                      }
+                    }}
+                    className="btn-ghost mt-2 text-[11px]"
+                  >
+                    <ShieldCheck className="h-3 w-3" /> Admin override
+                  </button>
+                )}
+              </div>
+            ) : null}
 
             {sessions.length > 0 && (
               <div className="mb-4 rounded-xl border border-brand-500/20 bg-brand-500/5 p-3">
@@ -263,20 +334,28 @@ export function TaskModal({
             </div>
             <div>
               <label className="mb-1 block text-xs font-medium text-gray-400">Assignee</label>
-              <select
-                className="input"
-                value={assigneeId}
-                onChange={(e) => setAssigneeId(e.target.value)}
-              >
-                <option value="" className="bg-ink-800">
-                  Unassigned
-                </option>
-                {members.map((m) => (
-                  <option key={m.id} value={m.id} className="bg-ink-800">
-                    {m.name}
+              {isProjectAdmin ? (
+                <select
+                  className="input"
+                  value={assigneeId}
+                  onChange={(e) => setAssigneeId(e.target.value)}
+                  required
+                >
+                  <option value="" className="bg-ink-800">
+                    Select teammate…
                   </option>
-                ))}
-              </select>
+                  {members.map((m) => (
+                    <option key={m.id} value={m.id} className="bg-ink-800">
+                      {m.name}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <p className="input flex items-center text-sm text-gray-300">
+                  {currentUser?.name ?? "You"}
+                  <span className="ml-2 text-xs text-gray-500">(only you and admins see this task)</span>
+                </p>
+              )}
             </div>
           </div>
 

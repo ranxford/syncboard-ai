@@ -6,6 +6,11 @@ import { assertMember, getMembership } from "../lib/access.js";
 import { recordActivity } from "../lib/board.js";
 import { ensurePersonalTimeline, milestoneProgress } from "../lib/timelines.js";
 import { resolveMemberBrief } from "../lib/alignmentPositions.js";
+import { broadcastTimelineUpdated } from "../lib/timelineBroadcast.js";
+import {
+  communityTaskProgressPct,
+  memberTaskProgressPct,
+} from "../lib/timelineSync.js";
 
 export const milestonesRouter = Router();
 milestonesRouter.use(requireAuth);
@@ -90,39 +95,46 @@ milestonesRouter.get("/projects/:projectId/timelines", async (req: AuthedRequest
     personalByUser.set(m.ownerId, list);
   }
 
-  const memberTimelines = members
-    .filter((m) => isAdmin || m.userId === req.userId!)
-    .map((m) => {
-      const ms = personalByUser.get(m.userId) ?? [];
-      const brief = resolveMemberBrief({
-        field: projectField,
-        positionKey: m.positionKey,
-        positionLabel: m.positionLabel,
-        assignedRequirements: m.assignedRequirements,
-      });
-      return {
-        userId: m.user.id,
-        name: m.user.name,
-        avatarColor: m.user.avatarColor,
-        role: m.role,
-        positionKey: brief.positionKey,
-        positionLabel: brief.positionLabel,
-        isMe: m.userId === req.userId!,
-        milestones: ms,
-        progressPct: milestoneProgress(ms),
-      };
-    });
+  const memberTimelines = await Promise.all(
+    members
+      .filter((m) => isAdmin || m.userId === req.userId!)
+      .map(async (m) => {
+        const ms = personalByUser.get(m.userId) ?? [];
+        const brief = resolveMemberBrief({
+          field: projectField,
+          positionKey: m.positionKey,
+          positionLabel: m.positionLabel,
+          assignedRequirements: m.assignedRequirements,
+        });
+        const progressPct = await memberTaskProgressPct(projectId, m.userId);
+        return {
+          userId: m.user.id,
+          name: m.user.name,
+          avatarColor: m.user.avatarColor,
+          role: m.role,
+          positionKey: brief.positionKey,
+          positionLabel: brief.positionLabel,
+          isMe: m.userId === req.userId!,
+          milestones: ms,
+          progressPct,
+        };
+      }),
+  );
+
+  const communityProgressPct = await communityTaskProgressPct(projectId);
 
   res.json({
     community: {
       milestones: community,
-      progressPct: milestoneProgress(community),
+      progressPct: communityProgressPct || milestoneProgress(community),
     },
     members: memberTimelines,
     boardProgress: {
       totalTasks: boardTasks,
       doneTasks: boardDone,
-      progressPct: boardTasks === 0 ? 0 : Math.round((boardDone / boardTasks) * 100),
+      progressPct:
+        communityProgressPct ||
+        (boardTasks === 0 ? 0 : Math.round((boardDone / boardTasks) * 100)),
     },
     canManageCommunity: isAdmin,
   });
@@ -218,6 +230,11 @@ milestonesRouter.post("/projects/:projectId/milestones", async (req: AuthedReque
     audience: scope === "personal" ? "admins" : "all",
   });
 
+  void broadcastTimelineUpdated(
+    req.params.projectId,
+    scope === "personal" ? [req.userId!] : undefined,
+  );
+
   res.status(201).json({ milestone: serialize(milestone) });
 });
 
@@ -266,6 +283,7 @@ milestonesRouter.post("/milestones/:id/share-to-community", async (req: AuthedRe
   });
 
   res.status(201).json({ milestone: serialize(shared) });
+  void broadcastTimelineUpdated(existing.projectId, [req.userId!]);
 });
 
 milestonesRouter.patch("/milestones/:id", async (req: AuthedRequest, res) => {
@@ -316,6 +334,11 @@ milestonesRouter.patch("/milestones/:id", async (req: AuthedRequest, res) => {
     },
   });
 
+  void broadcastTimelineUpdated(
+    existing.projectId,
+    existing.ownerId ? [existing.ownerId] : undefined,
+  );
+
   res.json({ milestone: serialize(milestone) });
 });
 
@@ -342,5 +365,9 @@ milestonesRouter.delete("/milestones/:id", async (req: AuthedRequest, res) => {
   }
 
   await prisma.milestone.delete({ where: { id: existing.id } });
+  void broadcastTimelineUpdated(
+    existing.projectId,
+    existing.ownerId ? [existing.ownerId] : undefined,
+  );
   res.json({ ok: true });
 });

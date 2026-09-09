@@ -14,6 +14,9 @@ export interface Member {
   email: string;
   avatarColor: string;
   role: string;
+  positionKey?: string;
+  positionLabel?: string;
+  assignedRequirements?: string;
 }
 
 export type Priority = "low" | "medium" | "high" | "urgent";
@@ -31,9 +34,25 @@ export interface Task {
   dueDate: string | null;
   enteredColumnAt: string;
   completedAt: string | null;
+  reviewStatus?: "none" | "pending" | "passed" | "failed";
+  reviewFeedback?: string;
+  reviewCheckedAt?: string | null;
+  reviewOverride?: boolean;
   createdAt: string;
   updatedAt: string;
   assignee?: { id: string; name: string; avatarColor: string } | null;
+}
+
+export interface ProjectReviewAnalysis {
+  summary: string;
+  blockers: string[];
+  recommendations: string[];
+}
+
+export interface AiProviderInfo {
+  provider: string;
+  model: string;
+  configured: boolean;
 }
 
 export interface Comment {
@@ -82,6 +101,8 @@ export interface Board {
     visibility: ProjectVisibility;
     field?: string;
     requirements?: string;
+    reviewAnalysis?: string;
+    reviewAnalysisAt?: string | null;
   };
   members: Member[];
   columns: Column[];

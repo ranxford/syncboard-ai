@@ -4,7 +4,8 @@ import { prisma } from "../prisma.js";
 import { requireAuth, type AuthedRequest } from "../middleware/auth.js";
 import { assertCanManageTeam, assertMember, getMembership } from "../lib/access.js";
 import { emitToProject } from "../realtime/io.js";
-import { getBoardState } from "../lib/board.js";
+import { notifyAlignmentAssigned } from "../realtime/notifications.js";
+import { getBoardState, broadcastBoardUpdate } from "../lib/board.js";
 import {
   alignmentEffectivenessSummary,
   buildAlignmentReport,
@@ -62,8 +63,7 @@ alignmentRouter.put("/projects/:projectId/requirements", async (req: AuthedReque
     data: { requirements: parsed.data.requirements.trim() },
   });
 
-  const board = await getBoardState(req.params.projectId);
-  if (board) emitToProject(req.params.projectId, "board:updated", { board });
+  await broadcastBoardUpdate(req.params.projectId);
   res.json({ ok: true, requirements: parsed.data.requirements.trim() });
 });
 
@@ -89,9 +89,16 @@ alignmentRouter.put("/projects/:projectId/member-requirements", async (req: Auth
   const projectId = req.params.projectId;
   const project = await prisma.project.findUnique({
     where: { id: projectId },
-    select: { field: true },
+    select: { field: true, name: true },
   });
   const projectField = project?.field ?? "general";
+  const projectName = project?.name ?? "Project";
+
+  const admin = await prisma.user.findUnique({
+    where: { id: req.userId! },
+    select: { name: true },
+  });
+  const adminName = admin?.name ?? "Admin";
 
   const memberIds = new Set(
     (
@@ -120,7 +127,18 @@ alignmentRouter.put("/projects/:projectId/member-requirements", async (req: Auth
         assignedRequirements: resolved.assignedRequirements,
       },
     });
+
+    notifyAlignmentAssigned({
+      userId: a.userId,
+      projectId,
+      projectName,
+      adminName,
+      positionLabel: resolved.positionLabel,
+    });
   }
+
+  emitToProject(projectId, "alignment:updated", { projectId });
+  await broadcastBoardUpdate(projectId);
 
   res.json({ ok: true });
 });

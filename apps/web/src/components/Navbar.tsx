@@ -6,10 +6,20 @@ import { LogOut } from "lucide-react";
 import { useAuth } from "@/store/auth";
 import { BrandLogo } from "./BrandLogo";
 import { Avatar } from "./Avatar";
+import { DeepSeekBadge } from "./DeepSeekBadge";
+import { useEffect, useState } from "react";
+import { api } from "@/lib/api";
+import type { AiProviderInfo } from "@/lib/types";
 
 export function Navbar({ children }: { children?: React.ReactNode }) {
   const { user, logout } = useAuth();
   const router = useRouter();
+  const [aiInfo, setAiInfo] = useState<AiProviderInfo | null>(null);
+
+  useEffect(() => {
+    if (!user) return;
+    void api.getAiProvider().then(setAiInfo).catch(() => {});
+  }, [user]);
 
   return (
     <header className="sticky top-0 z-30 border-b border-white/[0.07] bg-ink-950/90 backdrop-blur-md">
@@ -21,6 +31,7 @@ export function Navbar({ children }: { children?: React.ReactNode }) {
           </div>
         )}
         <div className="ml-auto flex items-center gap-2">
+          {user && <DeepSeekBadge info={aiInfo} compact />}
           {user && (
             <div className="flex items-center gap-2 rounded-md border border-white/[0.06] bg-white/[0.02] py-1 pl-1 pr-2.5">
               <Avatar name={user.name} color={user.avatarColor} size={26} />

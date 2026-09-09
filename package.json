@@ -23,7 +23,8 @@
     "setup": "npm install && node scripts/bootstrap-env.mjs && npm run db:setup && npm run db:seed",
     "source:manifest": "node scripts/generate-source-manifest.mjs",
     "email:test": "node scripts/test-email.mjs",
-    "docs:pdf": "node scripts/generate-documentation-pdf.mjs"
+    "docs:pdf": "node scripts/generate-documentation-pdf.mjs",
+    "docs:supervisor-pdf": "node scripts/generate-supervisor-pdf.mjs"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"

@@ -5,17 +5,30 @@ import { getSocketUrl } from "./runtimeConfig";
 let socket: Socket | null = null;
 let socketUrl: string | null = null;
 
+/** Drop the socket so the next call reconnects with the current JWT. */
+export function reconnectSocketWithAuth(): Socket {
+  socket?.disconnect();
+  socket = null;
+  socketUrl = null;
+  return getSocket();
+}
+
 export function getSocket(): Socket {
   const url = getSocketUrl();
+  const token = getToken();
   if (socket && socketUrl !== url) {
     socket.disconnect();
     socket = null;
   }
-  if (socket) return socket;
+  if (socket) {
+    socket.auth = { token };
+    if (!socket.connected) socket.connect();
+    return socket;
+  }
   socketUrl = url;
   socket = io(url, {
-    auth: { token: getToken() },
-    autoConnect: true,
+    auth: { token },
+    autoConnect: !!token,
     reconnection: true,
     reconnectionDelay: 800,
     reconnectionDelayMax: 4000,
