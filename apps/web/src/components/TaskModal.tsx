@@ -199,11 +199,11 @@ export function TaskModal({
                     ? "border-emerald-500/25 bg-emerald-500/5"
                     : task.reviewStatus === "failed"
                       ? "border-red-500/25 bg-red-500/5"
-                      : "border-violet-500/25 bg-violet-500/5"
+                      : "border-brand-500/25 bg-brand-500/5"
                 }`}
               >
-                <h3 className="mb-1 flex items-center gap-1.5 font-semibold text-violet-200">
-                  <Sparkles className="h-3.5 w-3.5" /> DeepSeek Review
+                <h3 className="mb-1 flex items-center gap-1.5 font-semibold text-brand-200">
+                  <Sparkles className="h-3.5 w-3.5" /> Review
                 </h3>
                 <p className="text-gray-300">{task.reviewFeedback || "No feedback yet."}</p>
                 {task.reviewStatus === "failed" && (
@@ -215,7 +215,7 @@ export function TaskModal({
                       try {
                         const { board: next } = await api.runTaskReview(task.id);
                         applyServerBoard(next);
-                        toast.success("DeepSeek re-review queued.");
+                        toast.success("Re-review queued.");
                       } catch (err: unknown) {
                         toast.error(err instanceof Error ? err.message : "Review failed.");
                       } finally {

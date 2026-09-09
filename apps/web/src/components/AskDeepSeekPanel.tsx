@@ -41,11 +41,11 @@ export function AskDeepSeekPanel({
         columnId: targetColumn.id,
       });
       applyServerBoard(res.board);
-      toast.success(`DeepSeek created ${res.created} task(s) for team members.`);
+      toast.success(`Created ${res.created} task(s) for team members.`);
       setInstruction("");
       onClose();
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : "DeepSeek task generation failed.");
+      toast.error(err instanceof Error ? err.message : "Task generation failed.");
     } finally {
       setBusy(false);
     }
@@ -53,11 +53,11 @@ export function AskDeepSeekPanel({
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-4 sm:items-center">
-      <div className="w-full max-w-lg rounded-xl border border-violet-500/20 bg-ink-900 shadow-2xl">
+      <div className="w-full max-w-lg rounded-xl border border-brand-500/20 bg-ink-900 shadow-2xl">
         <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
           <div className="flex items-center gap-2">
-            <Sparkles className="h-4 w-4 text-violet-300" />
-            <h2 className="text-sm font-semibold text-gray-100">Ask DeepSeek</h2>
+            <Sparkles className="h-4 w-4 text-brand-300" />
+            <h2 className="text-sm font-semibold text-gray-100">Ask AI</h2>
             <DeepSeekBadge info={aiInfo} compact />
           </div>
           <button type="button" onClick={onClose} className="rounded p-1 text-gray-500 hover:text-gray-200">
@@ -66,7 +66,7 @@ export function AskDeepSeekPanel({
         </div>
         <div className="space-y-3 p-4">
           <p className="text-xs text-gray-400">
-            Describe what the team should work on. DeepSeek creates one task per member in{" "}
+            Describe what the team should work on. AI creates one task per member in{" "}
             <strong className="text-gray-300">{targetColumn?.name ?? "To Do"}</strong>, using each
             member&apos;s assigned requirements.
           </p>

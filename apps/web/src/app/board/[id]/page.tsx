@@ -34,7 +34,6 @@ import { SyncRoomBoardTracker } from "@/components/syncroom/SyncRoomBoardTracker
 import { SyncRoomProjectHint } from "@/components/syncroom/SyncRoomProjectHint";
 import { SyncRoomWrapUp } from "@/components/syncroom/SyncRoomWrapUp";
 import { BoardToolsMenu } from "@/components/BoardToolsMenu";
-import { DeepSeekBadge } from "@/components/DeepSeekBadge";
 import { AskDeepSeekPanel } from "@/components/AskDeepSeekPanel";
 import { api } from "@/lib/api";
 import type { AiProviderInfo } from "@/lib/types";
@@ -177,7 +176,6 @@ function BoardInner({ projectId }: { projectId: string }) {
           {board?.project.field && (
             <span className="pill hidden lg:inline">{fieldLabel(board.project.field)}</span>
           )}
-          <DeepSeekBadge info={aiInfo} />
           <ConnectivityBadge />
         </div>
       </Navbar>
@@ -210,10 +208,10 @@ function BoardInner({ projectId }: { projectId: string }) {
             <button
               type="button"
               onClick={() => setAskDeepSeekOpen(true)}
-              className="btn-ghost hidden border-violet-500/30 text-violet-200 sm:inline-flex"
-              title="Ask DeepSeek to create tasks for all members"
+              className="btn-ghost hidden border-brand-500/30 text-brand-200 sm:inline-flex"
+              title="Ask AI to create tasks for all members"
             >
-              Ask DeepSeek
+              Ask AI
             </button>
           )}
           {board && (

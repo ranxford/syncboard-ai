@@ -25,3 +25,17 @@ test("heuristic review fails with empty work", () => {
   });
   assert.equal(result.passed, false);
 });
+
+test("heuristic review uses file excerpt content", () => {
+  const result = heuristicReviewTaskWork({
+    taskTitle: "Upload design",
+    taskDescription: "",
+    comments: [],
+    projectRequirements: "Deliver comprehensive documentation",
+    memberRequirements: "Write documentation specifications",
+    positionLabel: "Documentation",
+    artifactSummary: "file: spec.pdf",
+    codeExcerpt: "comprehensive documentation specifications for the project deliverable",
+  });
+  assert.ok(result.score >= 40);
+});

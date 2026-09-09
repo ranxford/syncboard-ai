@@ -36,9 +36,6 @@ export function LandingNav() {
           </nav>
         </div>
         <div className="flex items-center gap-2 sm:gap-3">
-          <span className="hidden items-center gap-1 rounded-full border border-violet-500/30 bg-violet-500/10 px-2.5 py-1 text-[11px] font-medium text-violet-200 sm:inline-flex">
-            Powered by DeepSeek
-          </span>
           {!authed && (
             <Link href="/login" className="hidden text-sm text-gray-400 hover:text-gray-200 sm:inline">
               Sign in

@@ -128,12 +128,13 @@ alignmentRouter.put("/projects/:projectId/member-requirements", async (req: Auth
       },
     });
 
-    notifyAlignmentAssigned({
+    await notifyAlignmentAssigned({
       userId: a.userId,
       projectId,
       projectName,
       adminName,
       positionLabel: resolved.positionLabel,
+      assignedRequirements: resolved.assignedRequirements,
     });
   }
 

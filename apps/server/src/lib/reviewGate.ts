@@ -34,7 +34,13 @@ export async function gatherTaskReviewContext(taskId: string) {
     : [];
   const extracted = await buildCodeCorpus(task.projectId, sources);
   const artifactSummary = sources
-    .map((s) => `${s.kind}: ${s.label || s.fileName || s.externalUrl}`)
+    .map((s) => {
+      const name = s.label || s.fileName || s.externalUrl || "attachment";
+      const meta = [s.kind, s.mimeType, s.note ? `note: ${s.note}` : ""]
+        .filter(Boolean)
+        .join(", ");
+      return `${meta}: ${name}`;
+    })
     .join("; ");
 
   return {
@@ -53,7 +59,7 @@ export async function runTaskReview(taskId: string): Promise<void> {
 
   await prisma.task.update({
     where: { id: taskId },
-    data: { reviewStatus: "pending", reviewFeedback: "DeepSeek is reviewing…" },
+    data: { reviewStatus: "pending", reviewFeedback: "Review in progress…" },
   });
   await broadcastBoardUpdate(ctx.task.projectId);
 
@@ -81,7 +87,7 @@ export async function runTaskReview(taskId: string): Promise<void> {
     projectId: ctx.task.projectId,
     userId: ctx.task.assigneeId,
     type: "ai.insight",
-    message: `DeepSeek review ${result.passed ? "passed" : "failed"} for "${ctx.task.title}"`,
+    message: `Review ${result.passed ? "passed" : "failed"} for "${ctx.task.title}"`,
     meta: { taskId, score: result.score, passed: result.passed },
   });
 

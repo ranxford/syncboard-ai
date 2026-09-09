@@ -195,8 +195,8 @@ export function KanbanBoard({
     <div className="relative flex h-full flex-col overflow-hidden">
       <div className="flex items-center justify-between border-b border-white/[0.06] px-4 py-2 md:px-6">
         <p className="text-xs text-gray-500">
-          Board workflow — work flows forward; <span className="text-violet-300">Review</span> is the
-          DeepSeek gate before Done.
+          Board workflow — work flows forward; <span className="text-brand-300">Review</span> is the
+          quality gate before Done.
         </p>
       </div>
       <BoardFilters

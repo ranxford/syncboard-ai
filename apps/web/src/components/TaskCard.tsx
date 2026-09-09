@@ -43,7 +43,7 @@ export function TaskCard({
           : inReview && task.reviewStatus === "passed"
             ? "border-emerald-500/25"
             : inReview
-              ? "border-violet-500/20"
+              ? "border-brand-500/20"
               : ""
       }`}
     >
@@ -112,7 +112,7 @@ export function TaskCard({
                 : task.reviewStatus === "failed"
                   ? "bg-red-500/12 text-red-300"
                   : task.reviewStatus === "pending"
-                    ? "bg-violet-500/12 text-violet-300"
+                    ? "bg-brand-500/12 text-brand-300"
                     : "text-gray-500"
             }`}
             title={task.reviewFeedback ?? undefined}
@@ -124,7 +124,7 @@ export function TaskCard({
             ) : task.reviewStatus === "failed" ? (
               <ShieldAlert className="h-3 w-3" />
             ) : null}
-            DeepSeek {task.reviewStatus}
+            Review {task.reviewStatus}
           </span>
         )}
       </div>

@@ -50,21 +50,21 @@ export function BoardColumn({
   const overLimit = column.wipLimit != null && column.tasks.length > column.wipLimit;
   const tasks = visibleTasks ?? column.tasks;
   const isReview = review || isReviewColumn(column.name);
-  const accent = done ? "#22c55e" : isReview ? "#a78bfa" : overLimit ? "#f59e0b" : "#2a9d8f";
+  const accent = done ? "#22c55e" : overLimit ? "#f59e0b" : "#2a9d8f";
 
   return (
     <div
-      className={`board-column ${isReview ? "board-column-review ring-1 ring-violet-500/20" : ""}`}
-      style={isReview ? { background: "linear-gradient(180deg, rgba(139,92,246,0.06) 0%, transparent 120px)" } : undefined}
+      className={`board-column ${isReview ? "board-column-review ring-1 ring-brand-500/20" : ""}`}
+      style={isReview ? { background: "linear-gradient(180deg, rgba(42,157,143,0.06) 0%, transparent 120px)" } : undefined}
     >
-      <div className={`board-column-header ${isReview ? "border-b border-violet-500/15" : ""}`}>
+      <div className={`board-column-header ${isReview ? "border-b border-brand-500/15" : ""}`}>
         <div className="flex min-w-0 items-center gap-2">
           {isReview ? (
-            <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-violet-400" />
+            <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-brand-400" />
           ) : (
             <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: accent }} />
           )}
-          <h3 className={`truncate text-[13px] font-semibold ${isReview ? "text-violet-100" : "text-gray-200"}`}>
+          <h3 className={`truncate text-[13px] font-semibold ${isReview ? "text-brand-100" : "text-gray-200"}`}>
             {column.name}
           </h3>
           <span className="pill tabular-nums">
@@ -113,7 +113,7 @@ export function BoardColumn({
         className={`flex min-h-[140px] flex-1 flex-col gap-2 p-2 transition-colors ${
           over
             ? isReview
-              ? "rounded-b-lg bg-violet-500/[0.08] ring-1 ring-inset ring-violet-500/25"
+              ? "rounded-b-lg bg-brand-500/[0.08] ring-1 ring-inset ring-brand-500/25"
               : "rounded-b-lg bg-brand-500/[0.06] ring-1 ring-inset ring-brand-500/20"
             : ""
         }`}
@@ -141,8 +141,8 @@ export function BoardColumn({
           </div>
         ))}
         {tasks.length === 0 && (
-          <p className={`px-2 py-6 text-center text-xs ${isReview ? "text-violet-400/60" : "text-gray-600"}`}>
-            {filtering ? "No matching tasks" : isReview ? "Drop work here for DeepSeek review" : "Drop tasks here"}
+          <p className={`px-2 py-6 text-center text-xs ${isReview ? "text-brand-400/60" : "text-gray-600"}`}>
+            {filtering ? "No matching tasks" : isReview ? "Drop work here for review" : "Drop tasks here"}
           </p>
         )}
       </div>

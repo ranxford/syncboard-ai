@@ -3,6 +3,7 @@ import { env } from "../env.js";
 import { emitToUser } from "./io.js";
 import { buildProjectSummaryForMember } from "../lib/dashboardProjects.js";
 import {
+  sendAlignmentAssignedEmail,
   sendProjectAddedEmail,
   sendSyncRoomRecapEmail,
   sendSyncRoomStartedEmail,
@@ -17,6 +18,7 @@ export type AppNotification = {
   starterName?: string;
   taskTitle?: string | null;
   positionLabel?: string;
+  assignedRequirements?: string;
 };
 
 export function notifyUser(userId: string, notification: AppNotification): void {
@@ -64,24 +66,48 @@ export async function notifyProjectAdded(params: {
   }
 }
 
-/** Tell a collaborator their analyzer track/criteria were assigned or updated. */
-export function notifyAlignmentAssigned(params: {
+/** Tell a collaborator their review role/criteria were assigned or updated. */
+export async function notifyAlignmentAssigned(params: {
   userId: string;
   projectId: string;
   projectName: string;
   adminName: string;
   positionLabel: string;
-}): void {
+  assignedRequirements: string;
+}): Promise<void> {
   const label = params.positionLabel ? ` as ${params.positionLabel}` : "";
+  const criteriaPreview = params.assignedRequirements.trim().slice(0, 120);
+  const criteriaSuffix = criteriaPreview
+    ? `: ${criteriaPreview}${params.assignedRequirements.length > 120 ? "…" : ""}`
+    : "";
+  const url = boardUrl(params.projectId);
+
   notifyUser(params.userId, {
     type: "alignment.assigned",
     projectId: params.projectId,
     projectName: params.projectName,
-    boardUrl: boardUrl(params.projectId),
+    boardUrl: url,
     positionLabel: params.positionLabel,
-    message: `${params.adminName} set your analyzer criteria${label} on “${params.projectName}”`,
+    assignedRequirements: params.assignedRequirements,
+    message: `${params.adminName} set your review criteria${label} on “${params.projectName}”${criteriaSuffix}`,
   });
   emitToUser(params.userId, "alignment:updated", { projectId: params.projectId });
+
+  const user = await prisma.user.findUnique({
+    where: { id: params.userId },
+    select: { email: true, name: true },
+  });
+  if (user) {
+    void sendAlignmentAssignedEmail({
+      to: user.email,
+      recipientName: user.name,
+      projectName: params.projectName,
+      adminName: params.adminName,
+      positionLabel: params.positionLabel,
+      assignedRequirements: params.assignedRequirements,
+      boardUrl: url,
+    });
+  }
 }
 
 /** Tell project members a SyncRoom session just started. */

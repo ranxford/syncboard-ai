@@ -80,9 +80,60 @@ export function extractTextFromZip(buffer: Buffer): { path: string; text: string
   return out;
 }
 
-export function extractTextFromBuffer(fileName: string, buffer: Buffer): { path: string; text: string }[] {
+/** Best-effort PDF text extraction without external dependencies. */
+export function extractPdfText(buffer: Buffer): string {
+  const raw = buffer.toString("latin1");
+  const chunks: string[] = [];
+  const parenRe = /\(([^)\\]*(?:\\.[^)\\]*)*)\)/g;
+  let match: RegExpExecArray | null;
+  while ((match = parenRe.exec(raw)) !== null) {
+    const piece = match[1]
+      .replace(/\\n/g, "\n")
+      .replace(/\\r/g, "\r")
+      .replace(/\\t/g, "\t")
+      .replace(/\\\(/g, "(")
+      .replace(/\\\)/g, ")");
+    if (piece.trim().length > 1) chunks.push(piece);
+  }
+  return chunks.join(" ").replace(/\s+/g, " ").trim();
+}
+
+function isImageFile(fileName: string, mimeType: string): boolean {
+  const lower = fileName.toLowerCase();
+  if (/^image\//.test(mimeType)) return true;
+  return [".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp"].some((ext) => lower.endsWith(ext));
+}
+
+function isPdfFile(fileName: string, mimeType: string): boolean {
+  const lower = fileName.toLowerCase();
+  return mimeType === "application/pdf" || lower.endsWith(".pdf");
+}
+
+function isSvgFile(fileName: string, mimeType: string): boolean {
+  const lower = fileName.toLowerCase();
+  return mimeType === "image/svg+xml" || lower.endsWith(".svg");
+}
+
+export function extractTextFromBuffer(
+  fileName: string,
+  buffer: Buffer,
+  mimeType = "",
+): { path: string; text: string }[] {
   const lower = fileName.toLowerCase();
   if (lower.endsWith(".zip")) return extractTextFromZip(buffer);
+  if (isPdfFile(fileName, mimeType)) {
+    const text = extractPdfText(buffer);
+    return text ? [{ path: fileName, text }] : [];
+  }
+  if (isSvgFile(fileName, mimeType)) {
+    const text = buffer.toString("utf8");
+    if (text.includes("\0")) return [];
+    return [{ path: fileName, text }];
+  }
+  if (isImageFile(fileName, mimeType)) {
+    const note = `[Image attachment: ${fileName}${mimeType ? ` (${mimeType})` : ""}, ${buffer.length} bytes — visual content not extracted; review filename and any notes.]`;
+    return [{ path: fileName, text: note }];
+  }
   if (isCodePath(fileName)) {
     const text = buffer.toString("utf8");
     if (text.includes("\0")) return [];
@@ -182,6 +233,23 @@ export async function buildCodeCorpus(
       break;
     }
 
+    if (
+      (source.kind === "link" ||
+        source.kind === "figma_link" ||
+        source.kind === "figma_export") &&
+      (source.externalUrl || source.note)
+    ) {
+      const linkText = [
+        `Link: ${source.label || source.kind}`,
+        source.externalUrl ? `URL: ${source.externalUrl}` : "",
+        source.note ? `Note: ${source.note}` : "",
+      ]
+        .filter(Boolean)
+        .join("\n");
+      appendText(parts, filePaths, `link:${source.label}`, linkText, budget);
+      continue;
+    }
+
     if (source.kind === "repo_link" && source.externalUrl) {
       const gh = await fetchGitHubReadme(source.externalUrl);
       const gl = gh ? null : await fetchGitLabReadme(source.externalUrl);
@@ -202,7 +270,20 @@ export async function buildCodeCorpus(
       continue;
     }
 
-    const extracted = extractTextFromBuffer(source.fileName || source.label, buffer);
+    const extracted = extractTextFromBuffer(
+      source.fileName || source.label,
+      buffer,
+      source.mimeType,
+    );
+    if (source.note.trim()) {
+      appendText(
+        parts,
+        filePaths,
+        `${source.fileName || source.label}:note`,
+        `Note for ${source.label}: ${source.note}`,
+        budget,
+      );
+    }
     for (const { path, text } of extracted) {
       if (budget.left <= 0 || filePaths.length >= MAX_CODE_FILES) {
         truncated = true;

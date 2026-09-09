@@ -10,9 +10,6 @@ export function LandingFooter() {
           <p className="mt-3 text-sm leading-relaxed text-gray-500">
             Invite-only boards for teams that work together under supervision.
           </p>
-          <p className="mt-2 inline-flex items-center gap-1 rounded-full border border-violet-500/25 bg-violet-500/10 px-2 py-0.5 text-[11px] font-medium text-violet-200">
-            AI powered by DeepSeek
-          </p>
         </div>
         <div>
           <h3 className="text-sm font-medium text-gray-200">Product</h3>

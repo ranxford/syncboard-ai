@@ -311,6 +311,54 @@ export async function sendProjectAddedEmail(params: {
   return sendTransactionalEmail({ to: params.to, subject, text, html });
 }
 
+/** Notify a member that review criteria were assigned for their role. */
+export async function sendAlignmentAssignedEmail(params: {
+  to: string;
+  recipientName: string;
+  projectName: string;
+  adminName: string;
+  positionLabel: string;
+  assignedRequirements: string;
+  boardUrl: string;
+}): Promise<boolean> {
+  if (!env.email.enabled) return false;
+
+  const role = params.positionLabel ? ` (${params.positionLabel})` : "";
+  const subject = `Review criteria assigned — ${params.projectName}`;
+  const criteria = params.assignedRequirements.trim() || "See the Review column on your project board for details.";
+  const text = [
+    `Hi ${params.recipientName},`,
+    "",
+    `${params.adminName} assigned review criteria for you${role} on “${params.projectName}”.`,
+    "",
+    criteria,
+    "",
+    `Open your board: ${params.boardUrl}`,
+  ].join("\n");
+
+  const html = `<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body style="margin:0;padding:0;background:#0b0f19;font-family:system-ui,-apple-system,sans-serif;color:#e5e7eb">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#0b0f19;padding:32px 16px">
+    <tr><td align="center">
+      <table width="100%" style="max-width:480px;background:#111827;border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:32px">
+        <tr><td>
+          <p style="margin:0 0 8px;font-size:13px;color:#2a9d8f;font-weight:600;letter-spacing:0.04em;text-transform:uppercase">SyncBoard</p>
+          <h1 style="margin:0 0 12px;font-size:22px;font-weight:600;color:#f9fafb">Review criteria assigned</h1>
+          <p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#9ca3af"><strong style="color:#d1d5db">${escapeHtml(params.adminName)}</strong> set criteria for you${escapeHtml(role)} on <strong style="color:#d1d5db">${escapeHtml(params.projectName)}</strong>.</p>
+          <p style="margin:0 0 24px;font-size:13px;line-height:1.6;color:#d1d5db;background:#0b0f19;border:1px solid rgba(255,255,255,0.08);border-radius:6px;padding:12px;white-space:pre-wrap">${escapeHtml(criteria)}</p>
+          <a href="${params.boardUrl}" style="display:inline-block;background:#2a9d8f;color:#fff;text-decoration:none;font-size:14px;font-weight:600;padding:12px 24px;border-radius:8px">View project board</a>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+
+  return sendTransactionalEmail({ to: params.to, subject, text, html });
+}
+
 function syncRoomEmailShell(title: string, bodyHtml: string, actionUrl: string, actionLabel: string) {
   return `<!DOCTYPE html>
 <html>
