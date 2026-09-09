@@ -2,8 +2,9 @@ import { prisma } from "../prisma.js";
 import { ai } from "../ai/index.js";
 import { buildCodeCorpus } from "./codeExtract.js";
 import { loadMemberReviewSources } from "./loadReviewSources.js";
-import { broadcastBoardUpdate, recordActivity } from "./board.js";
+import { broadcastBoardUpdate, recordActivity, getBoardState } from "./board.js";
 import { resolveMemberBrief } from "./alignmentPositions.js";
+import { columnIsReview } from "./columns.js";
 
 export async function gatherTaskReviewContext(taskId: string) {
   const task = await prisma.task.findUnique({
@@ -144,4 +145,96 @@ export async function runProjectReviewAnalysis(projectId: string): Promise<void>
   });
 
   await broadcastBoardUpdate(projectId);
+}
+
+/** Submit uploaded deliverables and run DeepSeek review on tasks in the Review column. */
+export async function submitReviewPackage(projectId: string, userId: string, viewerId: string) {
+  const sources = await loadMemberReviewSources(projectId, userId);
+  if (sources.length === 0) {
+    throw Object.assign(new Error("Attach at least one file, folder ZIP, or link before submitting."), {
+      status: 400,
+    });
+  }
+
+  const columns = await prisma.column.findMany({
+    where: { projectId },
+    select: { id: true, name: true },
+  });
+  const reviewColumnIds = columns.filter((c) => columnIsReview(c.name)).map((c) => c.id);
+
+  const reviewTasks = await prisma.task.findMany({
+    where: {
+      projectId,
+      assigneeId: userId,
+      columnId: { in: reviewColumnIds },
+    },
+    select: { id: true, title: true },
+  });
+
+  if (reviewTasks.length === 0) {
+    throw Object.assign(
+      new Error("Move your task into the Review column before submitting completed work."),
+      { status: 400 },
+    );
+  }
+
+  const results: { taskId: string; title: string; passed: boolean; feedback: string }[] = [];
+
+  for (const task of reviewTasks) {
+    await prisma.task.update({
+      where: { id: task.id },
+      data: {
+        reviewStatus: "pending",
+        reviewFeedback: "DeepSeek is reviewing your submission…",
+        reviewOverride: false,
+      },
+    });
+    await broadcastBoardUpdate(projectId);
+
+    const ctx = await gatherTaskReviewContext(task.id);
+    if (!ctx) continue;
+
+    const result = await ai.reviewTaskWork({
+      taskTitle: ctx.task.title,
+      taskDescription: ctx.task.description,
+      comments: ctx.comments,
+      projectRequirements: ctx.task.project.requirements,
+      memberRequirements: ctx.brief.assignedRequirements,
+      positionLabel: ctx.brief.positionLabel,
+      artifactSummary: ctx.artifactSummary,
+      codeExcerpt: ctx.codeExcerpt,
+    });
+
+    await prisma.task.update({
+      where: { id: task.id },
+      data: {
+        reviewStatus: result.passed ? "passed" : "failed",
+        reviewFeedback: result.feedback,
+        reviewCheckedAt: new Date(),
+      },
+    });
+
+    results.push({
+      taskId: task.id,
+      title: task.title,
+      passed: result.passed,
+      feedback: result.feedback,
+    });
+
+    await recordActivity({
+      projectId,
+      userId,
+      type: "ai.insight",
+      message: `Review ${result.passed ? "passed" : "failed"} for "${task.title}"`,
+      meta: { taskId: task.id, score: result.score, passed: result.passed },
+    });
+  }
+
+  await runProjectReviewAnalysis(projectId);
+  await broadcastBoardUpdate(projectId);
+
+  return {
+    results,
+    board: await getBoardState(projectId, { viewerId }),
+  };
 }

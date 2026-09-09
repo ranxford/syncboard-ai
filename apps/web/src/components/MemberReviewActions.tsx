@@ -55,7 +55,7 @@ export function MemberReviewActions({
         type="button"
         onClick={onOpenDeliverables}
         className="rounded-md p-1.5 text-gray-400 hover:bg-white/10 hover:text-gray-100"
-        title="Attach Figma exports, code ZIP, or repo link"
+        title="Open deliverables panel (also available in Review column)"
       >
         <FileUp className="h-4 w-4" />
       </button>

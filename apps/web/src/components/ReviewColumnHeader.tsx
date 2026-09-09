@@ -3,17 +3,20 @@
 import { ShieldCheck } from "lucide-react";
 import type { ProjectReviewAnalysis } from "@/lib/types";
 import { ReviewCriteriaPanel } from "./ReviewCriteriaPanel";
+import { ReviewColumnSubmissionHub } from "./ReviewColumnSubmissionHub";
 
 export function ReviewColumnHeader({
   projectId,
   requirements,
   reviewAnalysisRaw,
   isAdmin,
+  showSubmissionHub = true,
 }: {
   projectId: string;
   requirements: string;
   reviewAnalysisRaw?: string;
   isAdmin: boolean;
+  showSubmissionHub?: boolean;
 }) {
   let analysis: ProjectReviewAnalysis | null = null;
   if (reviewAnalysisRaw) {
@@ -29,9 +32,9 @@ export function ReviewColumnHeader({
       <div className="flex items-start gap-2">
         <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-brand-300" />
         <div className="min-w-0 flex-1">
-          <p className="text-[11px] font-semibold text-brand-200">Review Gate</p>
+          <p className="text-[11px] font-semibold text-brand-200">Final review</p>
           <p className="text-[10px] leading-relaxed text-gray-400">
-            Submit work here before Done. Review checks deliverables against admin criteria.
+            Upload your completed project files here. DeepSeek reviews them automatically before Done.
           </p>
         </div>
       </div>
@@ -49,6 +52,7 @@ export function ReviewColumnHeader({
         </div>
       )}
       {isAdmin && <ReviewCriteriaPanel projectId={projectId} requirements={requirements} />}
+      {showSubmissionHub && <ReviewColumnSubmissionHub projectId={projectId} />}
     </div>
   );
 }

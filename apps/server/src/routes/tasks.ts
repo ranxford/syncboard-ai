@@ -204,7 +204,9 @@ tasksRouter.post("/tasks/:taskId/move", async (req: AuthedRequest, res) => {
       ? "Tasks must go through Review before Done. Move the card to the Review column first."
       : task.reviewStatus === "failed"
         ? "DeepSeek review failed — fix issues and re-submit in Review before moving to Done."
-        : "DeepSeek review must pass before moving to Done. Move the task to Review and wait for approval.";
+        : task.reviewStatus === "none"
+          ? "Upload completed work in Review and submit for automated review before Done."
+          : "DeepSeek review must pass before moving to Done. Submit your deliverables in Review.";
     if (!isAdminRole(membership?.role)) {
       return res.status(403).json({
         error: message,
@@ -250,8 +252,8 @@ tasksRouter.post("/tasks/:taskId/move", async (req: AuthedRequest, res) => {
         completedAt: nowDone ? task.completedAt ?? new Date() : null,
         ...(columnChanged && movingToReview
           ? {
-              reviewStatus: "pending",
-              reviewFeedback: "Queued for DeepSeek review…",
+              reviewStatus: "none",
+              reviewFeedback: "Upload your completed work below and submit for automated review.",
               reviewOverride: false,
               hasBeenInReview: true,
             }
@@ -283,10 +285,6 @@ tasksRouter.post("/tasks/:taskId/move", async (req: AuthedRequest, res) => {
   });
 
   await broadcast(task.projectId, [task.assigneeId]);
-
-  if (columnChanged && movingToReview) {
-    void runTaskReview(task.id).then(() => runProjectReviewAnalysis(task.projectId));
-  }
 
   res.json({ board: await getBoardState(task.projectId, { viewerId: req.userId! }) });
 });

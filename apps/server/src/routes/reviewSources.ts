@@ -68,8 +68,12 @@ reviewSourcesRouter.post("/projects/:projectId/review-sources/link", async (req:
 
   const projectId = req.params.projectId;
   const membership = await getMembership(req.userId!, projectId);
-  if (membership?.role !== "member") {
-    return res.status(403).json({ error: "Only members attach review deliverables." });
+  const canAttach =
+    membership?.role === "member" ||
+    membership?.role === "admin" ||
+    membership?.role === "owner";
+  if (!canAttach) {
+    return res.status(403).json({ error: "You cannot attach review deliverables." });
   }
 
   const parsed = linkBody.safeParse(req.body);
@@ -115,8 +119,12 @@ reviewSourcesRouter.post(
 
     const projectId = req.params.projectId;
     const membership = await getMembership(req.userId!, projectId);
-    if (membership?.role !== "member") {
-      return res.status(403).json({ error: "Only members attach review deliverables." });
+    const canAttach =
+      membership?.role === "member" ||
+      membership?.role === "admin" ||
+      membership?.role === "owner";
+    if (!canAttach) {
+      return res.status(403).json({ error: "You cannot attach review deliverables." });
     }
 
     const file = req.file;

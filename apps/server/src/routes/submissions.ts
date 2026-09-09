@@ -11,6 +11,11 @@ import { loadMemberReviewSources } from "../lib/loadReviewSources.js";
 import { readinessMemberWithDeliverables } from "../lib/submissionReadiness.js";
 import { recordActivity } from "../lib/board.js";
 import { serializeReviewSource } from "../lib/reviewSources.js";
+import { submitReviewPackage } from "../lib/reviewGate.js";
+
+function canSubmitDeliverables(role: string | undefined): boolean {
+  return role === "member" || role === "admin" || role === "owner";
+}
 
 export const submissionsRouter = Router();
 submissionsRouter.use(requireAuth);
@@ -85,8 +90,8 @@ submissionsRouter.get("/projects/:projectId/submission/readiness", async (req: A
 
   const projectId = req.params.projectId;
   const membership = await getMembership(req.userId!, projectId);
-  if (membership?.role !== "member") {
-    return res.status(403).json({ error: "Only members submit deliverables." });
+  if (!canSubmitDeliverables(membership?.role)) {
+    return res.status(403).json({ error: "You cannot submit deliverables on this project." });
   }
 
   const readiness = await computeSubmissionReadiness(projectId, req.userId!);
@@ -120,14 +125,36 @@ submissionsRouter.post("/projects/:projectId/submission/analyze", async (req: Au
 
   const projectId = req.params.projectId;
   const membership = await getMembership(req.userId!, projectId);
-  if (membership?.role !== "member") {
-    return res.status(403).json({ error: "Only members analyze deliverables." });
+  if (!canSubmitDeliverables(membership?.role)) {
+    return res.status(403).json({ error: "You cannot analyze deliverables on this project." });
   }
 
   const readiness = await computeSubmissionReadiness(projectId, req.userId!);
   if (!readiness) return res.status(404).json({ error: "Project not found" });
 
   res.json({ readiness });
+});
+
+/** Upload deliverables in Review column → automated DeepSeek review on tasks in Review. */
+submissionsRouter.post("/projects/:projectId/review/submit", async (req: AuthedRequest, res) => {
+  try {
+    await assertMember(req.userId!, req.params.projectId);
+  } catch (e: any) {
+    return res.status(e.status ?? 403).json({ error: e.message });
+  }
+
+  const projectId = req.params.projectId;
+  const membership = await getMembership(req.userId!, projectId);
+  if (!canSubmitDeliverables(membership?.role)) {
+    return res.status(403).json({ error: "You cannot submit for review on this project." });
+  }
+
+  try {
+    const payload = await submitReviewPackage(projectId, req.userId!, req.userId!);
+    res.json(payload);
+  } catch (e: any) {
+    return res.status(e.status ?? 500).json({ error: e.message ?? "Review submission failed." });
+  }
 });
 
 /** Submit deliverable for admin review (member only). */

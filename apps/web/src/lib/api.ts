@@ -362,6 +362,15 @@ export const api = {
       { method: "POST", body: JSON.stringify({}) },
     ),
 
+  submitReviewPackage: (projectId: string) =>
+    request<{
+      results: { taskId: string; title: string; passed: boolean; feedback: string }[];
+      board: Board;
+    }>(`/api/projects/${projectId}/review/submit`, {
+      method: "POST",
+      body: JSON.stringify({}),
+    }),
+
   listSubmissions: (projectId: string) =>
     request<{ submissions: import("./types").DeliverableSubmissionRow[] }>(
       `/api/projects/${projectId}/submissions`,

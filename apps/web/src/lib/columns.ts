@@ -38,5 +38,8 @@ export function doneMoveBlockedMessage(task: {
   if (task.reviewStatus === "pending") {
     return "DeepSeek review is still running — wait for approval before moving to Done.";
   }
+  if (task.reviewStatus === "none") {
+    return "Upload your completed work in Review and submit for automated review before Done.";
+  }
   return "DeepSeek review must pass before moving to Done.";
 }

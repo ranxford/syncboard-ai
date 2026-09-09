@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ExternalLink, FileUp, Link2, Loader2, Trash2 } from "lucide-react";
+import { ExternalLink, FileUp, FolderUp, Link2, Loader2, Trash2 } from "lucide-react";
 import { api } from "@/lib/api";
 import type { ReviewSource } from "@/lib/types";
 import { toast } from "@/store/toast";
@@ -24,16 +24,20 @@ function kindLabel(kind: ReviewSource["kind"]) {
 export function ReviewSourcesPanel({
   projectId,
   readOnly = false,
+  compact = false,
 }: {
   projectId: string;
   readOnly?: boolean;
+  compact?: boolean;
 }) {
   const [sources, setSources] = useState<ReviewSource[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<string | null>(null);
   const [linkUrl, setLinkUrl] = useState("");
   const [linkLabel, setLinkLabel] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
+  const folderRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -49,13 +53,20 @@ export function ReviewSourcesPanel({
     void load();
   }, [load]);
 
-  async function onUpload(file: File) {
+  async function uploadFiles(files: FileList | File[]) {
+    const list = Array.from(files);
+    if (list.length === 0) return;
     setUploading(true);
+    let uploaded = 0;
     try {
-      await api.uploadReviewFile(projectId, file, {
-        label: linkLabel.trim() || file.name,
-      });
-      toast.success("File attached.");
+      for (const file of list) {
+        setUploadProgress(`Uploading ${uploaded + 1}/${list.length}: ${file.name}`);
+        await api.uploadReviewFile(projectId, file, { label: file.name });
+        uploaded += 1;
+      }
+      toast.success(
+        uploaded === 1 ? "File attached." : `${uploaded} files attached.`,
+      );
       setLinkLabel("");
       await load();
       notifySourcesUpdated(projectId);
@@ -63,6 +74,7 @@ export function ReviewSourcesPanel({
       toast.error(err instanceof Error ? err.message : "Upload failed.");
     } finally {
       setUploading(false);
+      setUploadProgress(null);
     }
   }
 
@@ -81,16 +93,21 @@ export function ReviewSourcesPanel({
     }
   }
 
+  const accept =
+    ".png,.jpg,.jpeg,.webp,.pdf,.docx,.zip,.ts,.tsx,.js,.jsx,.py,.md,.json,.txt,.csv,image/*,application/pdf,application/zip,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/*";
+
   return (
-    <div className="space-y-3">
-      <p className="text-[11px] text-gray-500">
-        Attach deliverables: code (.ts, .py, .js, .md), docs (PDF, DOCX), images, or ZIP archives.
-      </p>
+    <div className={`space-y-2 ${compact ? "" : "space-y-3"}`}>
+      {!compact && (
+        <p className="text-[11px] text-gray-500">
+          Attach deliverables: code, docs (PDF, DOCX), images, ZIP archives, or entire folders.
+        </p>
+      )}
 
       {loading ? (
         <p className="text-xs text-gray-500">Loading…</p>
       ) : sources.length > 0 ? (
-        <ul className="space-y-1.5">
+        <ul className="max-h-32 space-y-1 overflow-y-auto">
           {sources.map((s) => (
             <li
               key={s.id}
@@ -129,7 +146,7 @@ export function ReviewSourcesPanel({
           ))}
         </ul>
       ) : (
-        <p className="text-xs text-gray-500">Nothing attached yet.</p>
+        <p className="text-[10px] text-gray-500">Nothing attached yet — upload files or a folder ZIP below.</p>
       )}
 
       {!readOnly && (
@@ -137,7 +154,7 @@ export function ReviewSourcesPanel({
           <form onSubmit={(e) => void onAddLink(e)} className="space-y-1.5">
             <input
               className="input py-1.5 text-xs"
-              placeholder="Label (e.g. Auth API branch)"
+              placeholder="Label (e.g. Final report)"
               value={linkLabel}
               onChange={(e) => setLinkLabel(e.target.value)}
             />
@@ -156,23 +173,52 @@ export function ReviewSourcesPanel({
           <input
             ref={fileRef}
             type="file"
-            accept=".png,.jpg,.jpeg,.webp,.pdf,.docx,.zip,.ts,.tsx,.js,.jsx,.py,.md,.json,.txt,.csv,image/*,application/pdf,application/zip,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/*"
+            multiple
+            accept={accept}
             className="hidden"
             onChange={(e) => {
-              const f = e.target.files?.[0];
-              if (f) void onUpload(f);
+              const files = e.target.files;
+              if (files?.length) void uploadFiles(files);
               e.target.value = "";
             }}
           />
-          <button
-            type="button"
-            disabled={uploading}
-            onClick={() => fileRef.current?.click()}
-            className="btn-ghost flex w-full items-center justify-center gap-1.5 py-1.5 text-xs"
-          >
-            {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileUp className="h-3.5 w-3.5" />}
-            Upload file (code, PDF, DOCX, ZIP…)
-          </button>
+          <input
+            ref={folderRef}
+            type="file"
+            // @ts-expect-error webkitdirectory is supported in Chromium browsers
+            webkitdirectory=""
+            multiple
+            className="hidden"
+            onChange={(e) => {
+              const files = e.target.files;
+              if (files?.length) void uploadFiles(files);
+              e.target.value = "";
+            }}
+          />
+          <div className="grid grid-cols-2 gap-1.5">
+            <button
+              type="button"
+              disabled={uploading}
+              onClick={() => fileRef.current?.click()}
+              className="btn-ghost flex items-center justify-center gap-1 py-1.5 text-[10px]"
+            >
+              {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileUp className="h-3.5 w-3.5" />}
+              Files
+            </button>
+            <button
+              type="button"
+              disabled={uploading}
+              onClick={() => folderRef.current?.click()}
+              className="btn-ghost flex items-center justify-center gap-1 py-1.5 text-[10px]"
+              title="Upload all files from a folder"
+            >
+              {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FolderUp className="h-3.5 w-3.5" />}
+              Folder
+            </button>
+          </div>
+          {uploadProgress && (
+            <p className="text-[10px] text-brand-300">{uploadProgress}</p>
+          )}
         </>
       )}
     </div>
