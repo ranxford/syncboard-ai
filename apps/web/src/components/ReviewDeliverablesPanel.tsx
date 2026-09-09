@@ -3,6 +3,7 @@
 import { X, Inbox, FileUp } from "lucide-react";
 import { useEscape } from "@/lib/useEscape";
 import { ReviewSourcesPanel } from "./ReviewSourcesPanel";
+import { ReviewAnalyzeSection } from "./ReviewAnalyzeSection";
 import { AdminSubmissionsList } from "./AdminSubmissionsList";
 
 export function ReviewDeliverablesPanel({
@@ -35,7 +36,12 @@ export function ReviewDeliverablesPanel({
           </button>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto p-4">
-          {isMember && <ReviewSourcesPanel projectId={projectId} />}
+          {isMember && (
+            <>
+              <ReviewSourcesPanel projectId={projectId} />
+              <ReviewAnalyzeSection projectId={projectId} />
+            </>
+          )}
           {isAdmin && <AdminSubmissionsList projectId={projectId} />}
         </div>
       </aside>

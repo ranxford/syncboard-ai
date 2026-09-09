@@ -92,7 +92,20 @@ reviewSourcesRouter.post("/projects/:projectId/review-sources/link", async (req:
 
 reviewSourcesRouter.post(
   "/projects/:projectId/review-sources/upload",
-  upload.single("file"),
+  (req, res, next) => {
+    upload.single("file")(req, res, (err: unknown) => {
+      if (err instanceof multer.MulterError) {
+        if (err.code === "LIMIT_FILE_SIZE") {
+          return res.status(400).json({
+            error: `File too large — max ${Math.round(MAX_FILE_BYTES / (1024 * 1024))} MB.`,
+          });
+        }
+        return res.status(400).json({ error: err.message });
+      }
+      if (err) return next(err);
+      next();
+    });
+  },
   async (req: AuthedRequest, res) => {
     try {
       await assertMember(req.userId!, req.params.projectId);

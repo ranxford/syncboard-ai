@@ -38,11 +38,12 @@ export function MemberReviewActions({
     if (submitting) return;
     setSubmitting(true);
     try {
+      await api.getSubmissionReadiness(projectId);
       await api.submitDeliverable(projectId);
       toast.success("Submitted for review.");
       setExistingStatus("submitted");
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : "Could not submit.");
+      toast.error(err instanceof Error ? err.message : "Could not submit — attach files and run Analyze first.");
     } finally {
       setSubmitting(false);
     }

@@ -245,7 +245,8 @@ function BoardInner({ projectId }: { projectId: string }) {
             onClick={() => {
               const call = useCall.getState();
               if (call.phase === "in-call" || call.phase === "lobby" || call.phase === "connecting") {
-                call.setViewMode(call.viewMode === "minimized" ? "expanded" : call.viewMode);
+                if (call.viewMode === "minimized") call.setViewMode("expanded");
+                else if (call.viewMode === "fullscreen") call.setViewMode("expanded");
               } else {
                 void call.openLobby();
               }
@@ -319,16 +320,9 @@ function BoardInner({ projectId }: { projectId: string }) {
           </aside>
         )}
 
-        {/* SyncRoom docks as a right sidebar beside the board */}
-        {callPhase !== "idle" && callViewMode !== "minimized" && callViewMode !== "fullscreen" && (
-          <CallPanel />
-        )}
+        {/* Single SyncRoom mount — docked in-flow or fixed when minimized/fullscreen */}
+        {callPhase !== "idle" && <CallPanel />}
       </div>
-
-      {/* Floating SyncRoom when minimized or fullscreen */}
-      {callPhase !== "idle" && (callViewMode === "minimized" || callViewMode === "fullscreen") && (
-        <CallPanel />
-      )}
 
       {/* Modals & panels */}
       {(editing || addingColumnId) && board && (

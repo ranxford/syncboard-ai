@@ -1,8 +1,11 @@
 import { mkdir, unlink, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { nanoid } from "nanoid";
 
-export const UPLOAD_ROOT = join(process.cwd(), "uploads", "review");
+/** Colocate uploads with the Prisma data dir so Render's mounted disk persists files. */
+const SERVER_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
+export const UPLOAD_ROOT = join(SERVER_ROOT, "prisma", "uploads", "review");
 
 const ALLOWED_MIME = new Set([
   "image/png",

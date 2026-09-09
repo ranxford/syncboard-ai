@@ -18,9 +18,9 @@ function panelClass(mode: CallViewMode): string {
     return "fixed inset-3 z-[90] flex w-auto max-w-none flex-col overflow-hidden rounded-xl border border-white/10 bg-ink-900 shadow-2xl";
   }
   if (mode === "minimized") {
-    return "fixed bottom-4 right-4 z-[90] flex w-[min(92vw,18rem)] flex-col overflow-hidden rounded-xl border border-white/10 bg-ink-900 shadow-xl";
+    return "fixed bottom-4 right-4 z-[90] flex w-[min(92vw,18rem)] max-h-[min(85vh,32rem)] flex-col overflow-hidden rounded-xl border border-white/10 bg-ink-900 shadow-xl";
   }
-  return "flex h-full w-[min(100%,20rem)] shrink-0 flex-col overflow-hidden border-l border-white/10 bg-ink-900 lg:w-[22rem]";
+  return "flex h-full min-h-0 w-[min(100%,20rem)] max-w-[22rem] shrink-0 flex-col overflow-hidden border-l border-white/10 bg-ink-900 lg:w-[22rem]";
 }
 
 export function SyncRoomPanel() {
@@ -64,9 +64,10 @@ export function SyncRoomPanel() {
   const connecting = phase === "connecting";
   const inLobby = phase === "lobby";
   const total = participants.length + (inCall ? 1 : 0);
-  const minimized = viewMode === "minimized";
+  const minimized = viewMode === "minimized" && inCall;
   const showBody = !minimized;
   const docked = viewMode !== "fullscreen" && viewMode !== "minimized";
+  const canMinimize = inCall;
 
   function endOrClose() {
     if (inCall || connecting) leave();
@@ -146,7 +147,9 @@ export function SyncRoomPanel() {
                 </>
               )}
             </button>
-            <CallHeaderControls viewMode={viewMode} onViewMode={setViewMode} />
+            {canMinimize && (
+              <CallHeaderControls viewMode={viewMode} onViewMode={setViewMode} />
+            )}
           </div>
         </div>
 
