@@ -14,7 +14,6 @@ import { syncroomRouter } from "./routes/syncroom.js";
 import { dashboardRouter } from "./routes/dashboard.js";
 import { milestonesRouter } from "./routes/milestones.js";
 import { ideasRouter } from "./routes/ideas.js";
-import { alignmentRouter } from "./routes/alignment.js";
 import { submissionsRouter } from "./routes/submissions.js";
 import { reviewSourcesRouter } from "./routes/reviewSources.js";
 
@@ -88,7 +87,6 @@ export function createApp() {
   app.use("/api/dashboard", dashboardRouter);
   app.use("/api", milestonesRouter);
   app.use("/api", ideasRouter);
-  app.use("/api", alignmentRouter);
   app.use("/api", submissionsRouter);
   app.use("/api", reviewSourcesRouter);
 

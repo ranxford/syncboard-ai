@@ -18,12 +18,8 @@ export function BoardInsightNudges({ projectId }: { projectId: string }) {
     timer.current = setTimeout(() => {
       void api.getAnalytics(projectId).then(({ analytics }) => {
         for (const ins of analytics.insights) {
-          const isAlign = ins.type === "alignment" || ins.type === "requirements";
           if (seen.current.has(ins.id)) continue;
           if (ins.severity === "critical") {
-            seen.current.add(ins.id);
-            toast.info(`${ins.title} — ${ins.detail}`);
-          } else if (isAlign && ins.severity === "warning") {
             seen.current.add(ins.id);
             toast.info(`${ins.title} — ${ins.detail}`);
           }

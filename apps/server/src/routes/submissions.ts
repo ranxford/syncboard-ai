@@ -3,14 +3,7 @@ import { z } from "zod";
 import { prisma } from "../prisma.js";
 import { requireAuth, type AuthedRequest } from "../middleware/auth.js";
 import { assertMember, getMembership } from "../lib/access.js";
-import { buildAlignmentReport, filterAlignmentReportForViewer } from "../lib/alignmentReport.js";
-import { generateCollaboratorFeedback } from "../ai/alignmentFeedback.js";
-import { evaluateSubmissionReadiness } from "../ai/alignment.js";
-import { reviewMemberCode } from "../ai/codeReview.js";
-import { loadMemberReviewSources } from "../lib/loadReviewSources.js";
-import { readinessMemberWithDeliverables } from "../lib/submissionReadiness.js";
 import { recordActivity } from "../lib/board.js";
-
 import { serializeReviewSource } from "../lib/reviewSources.js";
 
 export const submissionsRouter = Router();
@@ -59,7 +52,7 @@ function serializeSubmission(row: {
   };
 }
 
-/** Pre-submit check — AI readiness vs manager requirements (member only). */
+/** Pre-submit status check (member only). */
 submissionsRouter.get("/projects/:projectId/submission/readiness", async (req: AuthedRequest, res) => {
   try {
     await assertMember(req.userId!, req.params.projectId);
@@ -69,23 +62,9 @@ submissionsRouter.get("/projects/:projectId/submission/readiness", async (req: A
 
   const membership = await getMembership(req.userId!, req.params.projectId);
   if (membership?.role !== "member") {
-    return res.status(403).json({ error: "Only members submit deliverables; managers set requirements." });
+    return res.status(403).json({ error: "Only members submit deliverables." });
   }
 
-  const built = await buildAlignmentReport(req.params.projectId);
-  if (!built) return res.status(404).json({ error: "Project not found" });
-
-  const sources = await loadMemberReviewSources(req.params.projectId, req.userId!);
-  const report = await readinessMemberWithDeliverables(built, req.params.projectId, req.userId!, sources);
-  const member = report.collaborators.find((c) => c.userId === req.userId!);
-  const codeReview = await reviewMemberCode({
-    projectId: req.params.projectId,
-    requirements: member?.assignedRequirements || built.report.requirements,
-    positionKey: member?.positionKey ?? "",
-    projectField: built.projectField,
-    sources,
-  });
-  const readiness = evaluateSubmissionReadiness(report, req.userId!, codeReview);
   const existing = await prisma.deliverableSubmission.findUnique({
     where: {
       projectId_userId: { projectId: req.params.projectId, userId: req.userId! },
@@ -93,7 +72,14 @@ submissionsRouter.get("/projects/:projectId/submission/readiness", async (req: A
   });
 
   res.json({
-    readiness,
+    readiness: {
+      ready: !existing || existing.status === "revision_requested",
+      score: 100,
+      status: "aligned",
+      blockers: [],
+      member: null,
+      codeReview: null,
+    },
     existingSubmission: existing
       ? {
           status: existing.status,
@@ -104,7 +90,7 @@ submissionsRouter.get("/projects/:projectId/submission/readiness", async (req: A
   });
 });
 
-/** Submit deliverable — blocked unless readiness.ready (AI gate). */
+/** Submit deliverable for admin review (member only). */
 submissionsRouter.post("/projects/:projectId/submission", async (req: AuthedRequest, res) => {
   try {
     await assertMember(req.userId!, req.params.projectId);
@@ -118,17 +104,6 @@ submissionsRouter.post("/projects/:projectId/submission", async (req: AuthedRequ
     return res.status(403).json({ error: "Only members submit deliverables." });
   }
 
-  if (
-    req.body &&
-    typeof req.body === "object" &&
-    "memberSummary" in req.body &&
-    String((req.body as { memberSummary?: string }).memberSummary ?? "").trim()
-  ) {
-    return res.status(400).json({
-      error: "Manual submission notes are disabled — the server generates AI feedback automatically.",
-    });
-  }
-
   const project = await prisma.project.findUnique({
     where: { id: projectId },
     select: { visibility: true, name: true },
@@ -137,44 +112,16 @@ submissionsRouter.post("/projects/:projectId/submission", async (req: AuthedRequ
     return res.status(400).json({ error: "Submissions are for community projects only." });
   }
 
-  const built = await buildAlignmentReport(projectId);
-  if (!built) return res.status(404).json({ error: "Project not found" });
-
-  const memberRow = built.report.collaborators.find((c) => c.userId === req.userId!);
-  const sources = await loadMemberReviewSources(projectId, req.userId!);
-  const report = await readinessMemberWithDeliverables(built, req.params.projectId, req.userId!, sources);
-  const member = report.collaborators.find((c) => c.userId === req.userId!);
-  const codeReview = await reviewMemberCode({
-    projectId,
-    requirements: member?.assignedRequirements || built.report.requirements,
-    positionKey: member?.positionKey ?? "",
-    projectField: built.projectField,
-    sources,
+  const existing = await prisma.deliverableSubmission.findUnique({
+    where: { projectId_userId: { projectId, userId: req.userId! } },
   });
-  const readiness = evaluateSubmissionReadiness(report, req.userId!, codeReview);
-  if (!readiness.ready || !readiness.member) {
-    return res.status(422).json({
-      error: "Requirements not met — fix the issues below and try again.",
-      readiness,
-    });
+  if (existing && existing.status === "submitted") {
+    return res.status(409).json({ error: "Already submitted — waiting for admin review." });
+  }
+  if (existing && existing.status === "accepted") {
+    return res.status(409).json({ error: "Submission already accepted." });
   }
 
-  const summary = readiness.member
-    ? (
-        await generateCollaboratorFeedback(
-          built.report.requirements,
-          readiness.member,
-          [
-            ...(built.tasksByAssignee.get(req.userId!) ?? [])
-              .filter((t) => !t.completedAt)
-              .map((t) => `${t.title} ${t.description}`.trim()),
-            ...(built.milestonesByOwner.get(req.userId!) ?? []).map(
-              (m) => `${m.title} ${m.description}`.trim(),
-            ),
-          ].filter(Boolean),
-        )
-      ).feedback
-    : "";
   const blockersJson = JSON.stringify([]);
 
   const submission = await prisma.deliverableSubmission.upsert({
@@ -183,16 +130,16 @@ submissionsRouter.post("/projects/:projectId/submission", async (req: AuthedRequ
       projectId,
       userId: req.userId!,
       status: "submitted",
-      memberSummary: summary,
-      alignmentScore: readiness.score,
-      alignmentStatus: readiness.status,
+      memberSummary: "",
+      alignmentScore: 100,
+      alignmentStatus: "aligned",
       blockersJson,
     },
     update: {
       status: "submitted",
-      memberSummary: summary,
-      alignmentScore: readiness.score,
-      alignmentStatus: readiness.status,
+      memberSummary: "",
+      alignmentScore: 100,
+      alignmentStatus: "aligned",
       blockersJson,
       submittedAt: new Date(),
       reviewedAt: null,
@@ -222,8 +169,8 @@ submissionsRouter.post("/projects/:projectId/submission", async (req: AuthedRequ
     projectId,
     userId: req.userId!,
     type: "deliverable_submitted",
-    message: `${submission.user.name} submitted their deliverable (${readiness.score}% alignment)`,
-    meta: { submissionId: submission.id, score: readiness.score },
+    message: `${submission.user.name} submitted their deliverable`,
+    meta: { submissionId: submission.id },
     audience: "admins",
   });
 

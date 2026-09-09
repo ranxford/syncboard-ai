@@ -8,16 +8,12 @@ import {
   Inbox,
   Lightbulb,
   MoreHorizontal,
-  Target,
   Users,
 } from "lucide-react";
 
 export function BoardToolsMenu({
   activityOpen,
-  alignmentAttention,
-  showAlignment,
   onTeam,
-  onAlignment,
   onIdeas,
   onActivity,
   onInsights,
@@ -26,10 +22,7 @@ export function BoardToolsMenu({
   showDeliverables,
 }: {
   activityOpen: boolean;
-  alignmentAttention?: boolean;
-  showAlignment?: boolean;
   onTeam: () => void;
-  onAlignment?: () => void;
   onIdeas: () => void;
   onActivity: () => void;
   onInsights: () => void;
@@ -60,27 +53,16 @@ export function BoardToolsMenu({
         type="button"
         onClick={() => setOpen((v) => !v)}
         className={`btn-ghost relative px-2.5 py-1.5 ${open ? "border-white/25 bg-white/10" : ""}`}
-        title="Team, alignment, ideas, and more"
+        title="Team, ideas, and more"
         aria-expanded={open}
       >
         <MoreHorizontal className="h-4 w-4" />
         <span className="hidden sm:inline">Tools</span>
-        {alignmentAttention && (
-          <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-amber-400 ring-2 ring-ink-900" />
-        )}
       </button>
 
       {open && (
         <div className="absolute right-0 top-full z-50 mt-1 min-w-[11rem] rounded-lg border border-white/10 bg-ink-900 py-1 shadow-xl">
           <MenuItem icon={Users} label="Team" onClick={() => pick(onTeam)} />
-          {showAlignment && onAlignment && (
-            <MenuItem
-              icon={Target}
-              label="Alignment"
-              hint={alignmentAttention ? "Needs attention" : undefined}
-              onClick={() => pick(onAlignment)}
-            />
-          )}
           {showDeliverables && onDeliverables && (
             <MenuItem
               icon={Inbox}

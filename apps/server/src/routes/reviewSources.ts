@@ -5,7 +5,6 @@ import { z } from "zod";
 import { prisma } from "../prisma.js";
 import { requireAuth, type AuthedRequest } from "../middleware/auth.js";
 import { assertMember, getMembership } from "../lib/access.js";
-import { buildAlignmentReport } from "../lib/alignmentReport.js";
 import { generateReviewBrief } from "../ai/reviewBrief.js";
 import { reviewMemberCode } from "../ai/codeReview.js";
 import { loadMemberReviewSources } from "../lib/loadReviewSources.js";
@@ -217,24 +216,34 @@ reviewSourcesRouter.post(
     });
     if (!submission) return res.status(404).json({ error: "No submission for this member." });
 
-    const built = await buildAlignmentReport(req.params.projectId);
-    const collab = built?.report.collaborators.find((c) => c.userId === req.params.userId);
+    const [project, memberShip] = await Promise.all([
+      prisma.project.findUnique({
+        where: { id: req.params.projectId },
+        select: { requirements: true, field: true },
+      }),
+      prisma.membership.findUnique({
+        where: {
+          userId_projectId: { userId: req.params.userId, projectId: req.params.projectId },
+        },
+        select: { positionKey: true, positionLabel: true, assignedRequirements: true },
+      }),
+    ]);
     const sources = await loadMemberReviewSources(req.params.projectId, req.params.userId);
-    const codeReview = built
+    const codeReview = project
       ? await reviewMemberCode({
           projectId: req.params.projectId,
-          requirements: collab?.assignedRequirements ?? built.report.requirements,
-          positionKey: collab?.positionKey ?? "",
-          projectField: built.projectField,
+          requirements: memberShip?.assignedRequirements ?? project.requirements,
+          positionKey: memberShip?.positionKey ?? "",
+          projectField: project.field,
           sources,
         })
       : null;
 
     const brief = generateReviewBrief({
       memberName: submission.user.name,
-      positionLabel: collab?.positionLabel ?? "",
-      assignedRequirements: collab?.assignedRequirements ?? "",
-      projectRequirements: built?.report.requirements ?? "",
+      positionLabel: memberShip?.positionLabel ?? "",
+      assignedRequirements: memberShip?.assignedRequirements ?? "",
+      projectRequirements: project?.requirements ?? "",
       alignmentScore: submission.alignmentScore,
       alignmentStatus: submission.alignmentStatus,
       memberSummary: submission.memberSummary,

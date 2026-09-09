@@ -32,14 +32,12 @@ export function AIPanel({
   onClose,
   onOpenMeeting,
   onStartSyncRoom,
-  onOpenAlignment,
 }: {
   projectId: string;
   open: boolean;
   onClose: () => void;
   onOpenMeeting: () => void;
   onStartSyncRoom: (task: { id: string; title: string }) => void;
-  onOpenAlignment?: () => void;
 }) {
   const [data, setData] = useState<AnalyticsResult | null>(null);
   const [loading, setLoading] = useState(false);
@@ -255,24 +253,7 @@ export function AIPanel({
                                   {ins.recommendation && (
                                     <p className="mt-1 text-[11px] text-brand-300">→ {ins.recommendation}</p>
                                   )}
-                                  {(ins.type === "alignment" || ins.type === "requirements") &&
-                                    onOpenAlignment && (
-                                      <button
-                                        type="button"
-                                        onClick={onOpenAlignment}
-                                        className="btn-primary mt-2 py-1 text-[10px]"
-                                      >
-                                        Open alignment
-                                      </button>
-                                    )}
-                                  {(ins.type === "alignment" || ins.type === "requirements") &&
-                                    !onOpenAlignment && (
-                                      <p className="mt-2 text-[10px] text-gray-500">
-                                        Use the AI review check bar on the board — it updates
-                                        automatically.
-                                      </p>
-                                    )}
-                                  {task && board && ins.type !== "alignment" && ins.type !== "requirements" && (
+                                  {task && board && (
                                     <InsightActions
                                       insight={ins}
                                       task={task}

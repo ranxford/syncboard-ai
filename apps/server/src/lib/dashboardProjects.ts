@@ -1,11 +1,6 @@
 import { prisma } from "../prisma.js";
 import { calls } from "../realtime/calls.js";
 import { columnIsDone } from "./columns.js";
-import {
-  alignmentEffectivenessSummary,
-  buildAlignmentReport,
-  filterAlignmentReportForViewer,
-} from "./alignmentReport.js";
 
 export type DashboardProjectSummary = {
   id: string;
@@ -20,8 +15,6 @@ export type DashboardProjectSummary = {
   overdueTasks: number;
   stalledTasks: number;
   syncRoomActive: boolean;
-  effectiveness?: ReturnType<typeof alignmentEffectivenessSummary>;
-  myAlignmentStatus?: string;
 };
 
 /** Build one dashboard card for a user's membership (used on invite push). */
@@ -74,22 +67,6 @@ export async function buildProjectSummaryForMember(
         }),
   ]);
 
-  const isAdmin = m.role === "owner" || m.role === "admin";
-  let effectiveness: ReturnType<typeof alignmentEffectivenessSummary> | undefined;
-  let myAlignmentStatus: string | undefined;
-
-  if (m.project.visibility === "shared") {
-    const built = await buildAlignmentReport(projectId);
-    if (built) {
-      if (isAdmin) {
-        effectiveness = alignmentEffectivenessSummary(built.report);
-      } else {
-        const mine = filterAlignmentReportForViewer(built.report, userId, false).collaborators[0];
-        myAlignmentStatus = mine?.status;
-      }
-    }
-  }
-
   return {
     id: m.project.id,
     name: m.project.name,
@@ -103,8 +80,6 @@ export async function buildProjectSummaryForMember(
     overdueTasks,
     stalledTasks,
     syncRoomActive: calls.list(projectId).length > 0,
-    effectiveness,
-    myAlignmentStatus,
   };
 }
 

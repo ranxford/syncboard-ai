@@ -8,8 +8,6 @@ import { getSocket, pingLatency } from "@/lib/socket";
 import { useBoard } from "@/store/board";
 import { useCall } from "@/store/call";
 import { useAuth } from "@/store/auth";
-import { api } from "@/lib/api";
-import type { AlignmentEffectiveness } from "@/lib/types";
 import type { Board, PresenceUser, Task } from "@/lib/types";
 import { AuthGate } from "@/components/AuthGate";
 import { Navbar } from "@/components/Navbar";
@@ -27,13 +25,9 @@ import { CallPanel } from "@/components/CallPanel";
 import { SyncRoomQuickControls } from "@/components/SyncRoomQuickControls";
 import { TeamPanel } from "@/components/TeamPanel";
 import { IdeasPanel } from "@/components/IdeasPanel";
-import {
-  alignmentNeedsAttention,
-} from "@/components/ProjectEffectivenessBar";
 import { MemberReviewActions } from "@/components/MemberReviewActions";
 import { AdminReviewInboxButton } from "@/components/AdminReviewInboxButton";
 import { ReviewDeliverablesPanel } from "@/components/ReviewDeliverablesPanel";
-import { ProjectAlignmentPanel } from "@/components/ProjectAlignmentPanel";
 import { ProjectFieldBar } from "@/components/ProjectFieldBar";
 import { ProjectTimeline } from "@/components/ProjectTimeline";
 import { SyncRoomBoardTracker } from "@/components/syncroom/SyncRoomBoardTracker";
@@ -65,19 +59,13 @@ function BoardInner({ projectId }: { projectId: string }) {
   const [feedOpen, setFeedOpen] = useState(false);
   const [teamOpen, setTeamOpen] = useState(false);
   const [ideasOpen, setIdeasOpen] = useState(false);
-  const [alignmentOpen, setAlignmentOpen] = useState(false);
   const [deliverablesOpen, setDeliverablesOpen] = useState(false);
   const [fieldPickerOpen, setFieldPickerOpen] = useState(false);
-  const [alignEffectiveness, setAlignEffectiveness] = useState<AlignmentEffectiveness | null>(null);
-  const [myAlignStatus, setMyAlignStatus] = useState<string | null>(null);
+  const [activityKey, setActivityKey] = useState(0);
 
   const user = useAuth((s) => s.user);
   const myRole = board?.members.find((m) => m.id === user?.id)?.role;
   const isProjectAdmin = myRole === "owner" || myRole === "admin";
-  const alignmentAttention =
-    board?.project.visibility === "shared" &&
-    alignmentNeedsAttention(isProjectAdmin, alignEffectiveness, myAlignStatus);
-  const [activityKey, setActivityKey] = useState(0);
 
   const callPhase = useCall((s) => s.phase);
   const callViewMode = useCall((s) => s.viewMode);
@@ -105,12 +93,21 @@ function BoardInner({ projectId }: { projectId: string }) {
     });
     socket.on("disconnect", () => setConnection("offline"));
 
-    socket.on("board:updated", (payload: { board: Board }) => {
+    socket.on("board:updated", (payload: { projectId?: string; board: Board }) => {
+      if (payload.projectId && payload.projectId !== projectId) return;
       applyServerBoard(payload.board);
       setActivityKey((k) => k + 1);
     });
     socket.on("presence:updated", (payload: { projectId: string; users: PresenceUser[] }) => {
       if (payload.projectId === projectId) setPresence(payload.users);
+    });
+
+    socket.on("timeline:updated", (payload: { projectId: string }) => {
+      if (payload.projectId === projectId) {
+        window.dispatchEvent(
+          new CustomEvent("syncboard:timeline-updated", { detail: { projectId } }),
+        );
+      }
     });
 
     // Connectivity-adaptive: react to the browser going on/offline
@@ -133,6 +130,7 @@ function BoardInner({ projectId }: { projectId: string }) {
       socket.off("disconnect");
       socket.off("board:updated");
       socket.off("presence:updated");
+      socket.off("timeline:updated");
       window.removeEventListener("online", onOnline);
       window.removeEventListener("offline", onOffline);
       clearInterval(latencyTimer);
@@ -152,24 +150,6 @@ function BoardInner({ projectId }: { projectId: string }) {
   useEffect(() => {
     if (searchParams.get("insights") === "1") setAiOpen(true);
   }, [searchParams]);
-
-  useEffect(() => {
-    if (!board || board.project.visibility !== "shared" || !isProjectAdmin) {
-      setAlignEffectiveness(null);
-      setMyAlignStatus(null);
-      return;
-    }
-    let cancelled = false;
-    void api.getAlignment(projectId).then(({ effectiveness, alignment }) => {
-      if (cancelled) return;
-      setAlignEffectiveness(effectiveness ?? null);
-      const mine = alignment.collaborators.find((c) => c.userId === user?.id);
-      setMyAlignStatus(mine?.status ?? null);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [board, projectId, user?.id, isProjectAdmin]);
 
   return (
     <div className="flex h-screen flex-col overflow-hidden">
@@ -272,8 +252,6 @@ function BoardInner({ projectId }: { projectId: string }) {
           </button>
           <BoardToolsMenu
             activityOpen={feedOpen}
-            alignmentAttention={alignmentAttention}
-            showAlignment={board?.project.visibility === "shared" && isProjectAdmin}
             showDeliverables={
               board?.project.visibility === "shared"
                 ? isProjectAdmin
@@ -284,7 +262,6 @@ function BoardInner({ projectId }: { projectId: string }) {
                 : undefined
             }
             onTeam={() => setTeamOpen(true)}
-            onAlignment={() => setAlignmentOpen(true)}
             onDeliverables={() => setDeliverablesOpen(true)}
             onIdeas={() => setIdeasOpen(true)}
             onActivity={() => setFeedOpen((v) => !v)}
@@ -351,14 +328,6 @@ function BoardInner({ projectId }: { projectId: string }) {
           projectId={projectId}
           open={aiOpen}
           onClose={() => setAiOpen(false)}
-          onOpenAlignment={
-            isProjectAdmin
-              ? () => {
-                  setAiOpen(false);
-                  setAlignmentOpen(true);
-                }
-              : undefined
-          }
           onOpenMeeting={() => {
             setAiOpen(false);
             setMeetingOpen(true);
@@ -381,18 +350,6 @@ function BoardInner({ projectId }: { projectId: string }) {
 
       <TeamPanel projectId={projectId} open={teamOpen} onClose={() => setTeamOpen(false)} />
       <IdeasPanel projectId={projectId} open={ideasOpen} onClose={() => setIdeasOpen(false)} />
-      <ProjectAlignmentPanel
-        projectId={projectId}
-        open={alignmentOpen}
-        onClose={() => setAlignmentOpen(false)}
-        onSaved={() => {
-          void api.getAlignment(projectId).then(({ effectiveness, alignment }) => {
-            setAlignEffectiveness(effectiveness ?? null);
-            const mine = alignment.collaborators.find((c) => c.userId === user?.id);
-            setMyAlignStatus(mine?.status ?? null);
-          });
-        }}
-      />
 
       {board?.project.visibility === "shared" && (
         <ReviewDeliverablesPanel

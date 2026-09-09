@@ -39,9 +39,13 @@ services:
           name: syncboard-web
           envVarKey: RENDER_EXTERNAL_URL
 
-      # ── AI (heuristic = no OpenAI key needed for demos) ──
+      # ── AI (DeepSeek for meeting summaries; board analytics stay heuristic) ──
       - key: AI_PROVIDER
-        value: heuristic
+        value: deepseek
+      - key: DEEPSEEK_API_KEY
+        sync: false
+      - key: DEEPSEEK_MODEL
+        value: deepseek-chat
       - key: OPENAI_API_KEY
         value: ""
       - key: OPENAI_MODEL

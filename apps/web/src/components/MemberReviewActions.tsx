@@ -1,20 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { FileUp, Loader2, Send } from "lucide-react";
-import { api, ApiError } from "@/lib/api";
-import { useAutoSubmissionReadiness } from "@/lib/useAutoSubmissionReadiness";
-import type { SubmissionReadiness } from "@/lib/types";
+import { api } from "@/lib/api";
 import { toast } from "@/store/toast";
 
-function blockerMessage(readiness: SubmissionReadiness | null): string {
-  if (!readiness?.blockers.length) {
-    return "Complete alignment check first — update tasks, timeline, or attach deliverables.";
-  }
-  return readiness.blockers.map((b) => b.message).join(" ");
-}
-
-/** Compact member controls — lives in the toolbar, not a full-width bar. */
+/** Compact member controls — submit deliverables without AI analyzer gating. */
 export function MemberReviewActions({
   projectId,
   onOpenDeliverables,
@@ -22,23 +13,15 @@ export function MemberReviewActions({
   projectId: string;
   onOpenDeliverables: () => void;
 }) {
-  const { readiness, existingStatus, analyzing, refresh } = useAutoSubmissionReadiness(projectId, true);
+  const [existingStatus, setExistingStatus] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  const ready = readiness?.ready ?? false;
-  const score = readiness?.score ?? 0;
-  const codeReview = readiness?.codeReview;
-  const scoreTitle = [
-    readiness?.member?.aiFeedback,
-    codeReview?.isTechTrack && codeReview.analyzed
-      ? `Code: ${codeReview.score}% (${codeReview.fileCount} files)`
-      : codeReview?.isTechTrack
-        ? "Attach code ZIP or repo link"
-        : null,
-    !ready && readiness?.blockers.length ? blockerMessage(readiness) : null,
-  ]
-    .filter(Boolean)
-    .join(" · ");
+  useEffect(() => {
+    void api.getSubmissionReadiness(projectId).then(({ existingSubmission }) => {
+      setExistingStatus(existingSubmission?.status ?? null);
+    });
+  }, [projectId]);
+
   const accepted = existingStatus === "accepted";
   const submitted = existingStatus === "submitted";
   const canSubmit = !accepted && !submitted;
@@ -52,26 +35,14 @@ export function MemberReviewActions({
   }
 
   async function submit() {
-    if (analyzing || submitting) return;
+    if (submitting) return;
     setSubmitting(true);
     try {
-      const data = await refresh();
-      const latest = data?.readiness ?? readiness;
-      if (!latest?.ready) {
-        toast.error(blockerMessage(latest));
-        return;
-      }
       await api.submitDeliverable(projectId);
       toast.success("Submitted for review.");
-      await refresh();
+      setExistingStatus("submitted");
     } catch (err: unknown) {
-      if (err instanceof ApiError && err.data.readiness && typeof err.data.readiness === "object") {
-        const r = err.data.readiness as SubmissionReadiness;
-        toast.error(blockerMessage(r));
-      } else {
-        toast.error(err instanceof Error ? err.message : "Could not submit.");
-      }
-      await refresh();
+      toast.error(err instanceof Error ? err.message : "Could not submit.");
     } finally {
       setSubmitting(false);
     }
@@ -79,14 +50,6 @@ export function MemberReviewActions({
 
   return (
     <div className="flex items-center gap-1 border-l border-white/10 pl-2">
-      <span
-        className={`hidden rounded-md px-1.5 py-1 text-[11px] font-medium sm:inline ${
-          ready ? "bg-emerald-500/15 text-emerald-300" : "bg-white/5 text-gray-400"
-        }`}
-        title={scoreTitle || "AI alignment score"}
-      >
-        {analyzing ? "…" : `${score}%`}
-      </span>
       <button
         type="button"
         onClick={onOpenDeliverables}
@@ -98,10 +61,10 @@ export function MemberReviewActions({
       {canSubmit && (
         <button
           type="button"
-          disabled={submitting || analyzing}
+          disabled={submitting}
           onClick={() => void submit()}
-          className={`btn-primary px-2 py-1 text-[11px] ${!ready ? "opacity-60" : ""}`}
-          title={ready ? "Submit for admin review" : blockerMessage(readiness)}
+          className="btn-primary px-2 py-1 text-[11px]"
+          title="Submit for admin review"
         >
           {submitting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
           <span className="hidden md:inline">Submit</span>

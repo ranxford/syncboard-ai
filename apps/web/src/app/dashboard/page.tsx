@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import {
   AlertTriangle,
@@ -9,7 +9,6 @@ import {
   Lock,
   Plus,
   Radio,
-  Target,
   Trash2,
 } from "lucide-react";
 import { api } from "@/lib/api";
@@ -21,6 +20,7 @@ import { AuthGate } from "@/components/AuthGate";
 import { Navbar } from "@/components/Navbar";
 import { TeammateLiveFeed } from "@/components/TeammateLiveFeed";
 import { useTeammateAwareness } from "@/lib/useTeammateAwareness";
+import { useDashboardRealtime } from "@/lib/useDashboardRealtime";
 
 function DashboardInner() {
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
@@ -36,7 +36,7 @@ function DashboardInner() {
   const [fieldFilter, setFieldFilter] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
 
-  async function load() {
+  const load = useCallback(async () => {
     try {
       const [{ projects, teammates }, { tasks }] = await Promise.all([api.dashboard(), api.myTasks()]);
       setProjects(projects);
@@ -45,11 +45,20 @@ function DashboardInner() {
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
+
+  const handleProjectAdded = useCallback((project: ProjectSummary) => {
+    setProjects((prev) => {
+      if (prev.some((p) => p.id === project.id)) return prev;
+      return [project, ...prev];
+    });
+  }, []);
+
+  useDashboardRealtime(load, handleProjectAdded);
 
   useEffect(() => {
-    load();
-  }, []);
+    void load();
+  }, [load]);
 
   const totalOverdue = projects.reduce((n, p) => n + (p.overdueTasks ?? 0), 0);
   const liveRooms = projects.filter((p) => p.syncRoomActive).length;
@@ -382,22 +391,6 @@ function DashboardInner() {
                     {(p.stalledTasks ?? 0) > 0 && (
                       <span>{p.stalledTasks} stalled</span>
                     )}
-                    {p.visibility === "shared" && p.effectiveness?.needsBrief && (
-                      <span className="flex items-center gap-1 text-amber-400">
-                        <Target className="h-3 w-3" /> Needs brief
-                      </span>
-                    )}
-                    {p.visibility === "shared" && (p.effectiveness?.offTrack ?? 0) > 0 && (
-                      <span className="text-red-300/90">{p.effectiveness!.offTrack} off track</span>
-                    )}
-                    {p.visibility === "shared" &&
-                      p.myAlignmentStatus &&
-                      p.myAlignmentStatus !== "aligned" &&
-                      p.myAlignmentStatus !== "no_brief" && (
-                        <span className="text-amber-400 capitalize">
-                          You: {p.myAlignmentStatus.replace("_", " ")}
-                        </span>
-                      )}
                   </div>
                 </Link>
               </div>

@@ -15,9 +15,14 @@ export const env = {
   databaseUrl: required("DATABASE_URL", "file:./dev.db"),
   redisUrl: process.env.REDIS_URL || null,
   ai: {
-    provider: (process.env.AI_PROVIDER ?? "heuristic") as "heuristic" | "openai",
+    provider: (process.env.AI_PROVIDER ?? "heuristic") as
+      | "heuristic"
+      | "openai"
+      | "deepseek",
     openaiApiKey: process.env.OPENAI_API_KEY ?? "",
     openaiModel: process.env.OPENAI_MODEL ?? "gpt-4o-mini",
+    deepseekApiKey: process.env.DEEPSEEK_API_KEY ?? "",
+    deepseekModel: process.env.DEEPSEEK_MODEL ?? "deepseek-chat",
   },
   email: {
     from:
