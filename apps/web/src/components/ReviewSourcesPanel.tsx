@@ -84,7 +84,7 @@ export function ReviewSourcesPanel({
   return (
     <div className="space-y-3">
       <p className="text-[11px] text-gray-500">
-        Design: Figma or images. Software: GitHub link or ZIP of source (.ts, .py, .js, .md).
+        Attach deliverables: code (.ts, .py, .js, .md), docs (PDF, DOCX), images, or ZIP archives.
       </p>
 
       {loading ? (
@@ -156,7 +156,7 @@ export function ReviewSourcesPanel({
           <input
             ref={fileRef}
             type="file"
-            accept=".png,.jpg,.jpeg,.webp,.pdf,.zip,.ts,.tsx,.js,.jsx,.py,.md,.json,image/*,application/pdf,application/zip,text/*"
+            accept=".png,.jpg,.jpeg,.webp,.pdf,.docx,.zip,.ts,.tsx,.js,.jsx,.py,.md,.json,.txt,.csv,image/*,application/pdf,application/zip,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/*"
             className="hidden"
             onChange={(e) => {
               const f = e.target.files?.[0];
@@ -171,7 +171,7 @@ export function ReviewSourcesPanel({
             className="btn-ghost flex w-full items-center justify-center gap-1.5 py-1.5 text-xs"
           >
             {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileUp className="h-3.5 w-3.5" />}
-            Upload code ZIP or source file
+            Upload file (code, PDF, DOCX, ZIP…)
           </button>
         </>
       )}

@@ -38,6 +38,7 @@ export interface Task {
   reviewFeedback?: string;
   reviewCheckedAt?: string | null;
   reviewOverride?: boolean;
+  hasBeenInReview?: boolean;
   createdAt: string;
   updatedAt: string;
   assignee?: { id: string; name: string; avatarColor: string } | null;

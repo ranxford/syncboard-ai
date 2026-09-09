@@ -9,7 +9,13 @@ import { useBoardZoom } from "@/store/boardZoom";
 import { useAuth } from "@/store/auth";
 import type { PresenceUser, Task } from "@/lib/types";
 import { SOFTWARE_ONLY_LABELS, fieldLabel, suggestedLabelsForField } from "@/lib/projectFields";
-import { canCreateTaskInColumn, isReviewColumn } from "@/lib/columns";
+import {
+  canCreateTaskInColumn,
+  canMoveTaskToDone,
+  doneMoveBlockedMessage,
+  isReviewColumn,
+} from "@/lib/columns";
+import { toast } from "@/store/toast";
 import { BoardColumn } from "./BoardColumn";
 import { BoardZoomControls } from "./BoardZoomControls";
 import {
@@ -152,6 +158,27 @@ export function KanbanBoard({
     return col.tasks.filter((t) => t.id !== draggingId);
   }
 
+  function draggedTask(): Task | null {
+    if (!draggingId || !board) return null;
+    for (const col of board.columns) {
+      const task = col.tasks.find((t) => t.id === draggingId);
+      if (task) return task;
+    }
+    return null;
+  }
+
+  function tryMoveToColumn(columnId: string, index: number) {
+    const task = draggedTask();
+    if (!task) return;
+    if (doneColumnIds.has(columnId) && !canMoveTaskToDone(task)) {
+      toast.error(doneMoveBlockedMessage(task));
+      setDraggingId(null);
+      return;
+    }
+    moveTask(task.id, columnId, index);
+    setDraggingId(null);
+  }
+
   function handleDropBeforeTask(columnId: string, targetTaskId: string) {
     if (!draggingId || draggingId === targetTaskId) {
       setDraggingId(null);
@@ -159,15 +186,13 @@ export function KanbanBoard({
     }
     const siblings = siblingsExcludingDragged(columnId);
     const index = siblings.findIndex((t) => t.id === targetTaskId);
-    moveTask(draggingId, columnId, index === -1 ? siblings.length : index);
-    setDraggingId(null);
+    tryMoveToColumn(columnId, index === -1 ? siblings.length : index);
   }
 
   function handleDropToEnd(columnId: string) {
     if (!draggingId) return;
     const siblings = siblingsExcludingDragged(columnId);
-    moveTask(draggingId, columnId, siblings.length);
-    setDraggingId(null);
+    tryMoveToColumn(columnId, siblings.length);
   }
 
   function handleDragStart(taskId: string, e: DragEvent) {
@@ -244,6 +269,11 @@ export function KanbanBoard({
                 onDragEnd={handleDragEnd}
                 onDropBeforeTask={handleDropBeforeTask}
                 onDropToEnd={handleDropToEnd}
+                dropBlocked={
+                  !!draggingId &&
+                  doneColumnIds.has(column.id) &&
+                  !canMoveTaskToDone(draggedTask() ?? {})
+                }
               />
             ))}
           </div>

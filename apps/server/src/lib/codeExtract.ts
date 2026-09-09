@@ -8,6 +8,7 @@ const CODE_EXTENSIONS = new Set([
   ".md", ".html", ".css", ".scss", ".sass", ".less",
   ".vue", ".svelte", ".sql", ".yaml", ".yml", ".toml",
   ".sh", ".bash", ".rb", ".php", ".cs", ".cpp", ".c", ".h", ".hpp",
+  ".txt", ".csv", ".docx",
 ]);
 
 const SKIP_DIR = new Set([
@@ -109,6 +110,30 @@ function isPdfFile(fileName: string, mimeType: string): boolean {
   return mimeType === "application/pdf" || lower.endsWith(".pdf");
 }
 
+function isDocxFile(fileName: string, mimeType: string): boolean {
+  const lower = fileName.toLowerCase();
+  return (
+    mimeType ===
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+    lower.endsWith(".docx")
+  );
+}
+
+/** Extract plain text from a .docx (Office Open XML) buffer. */
+export function extractDocxText(buffer: Buffer): string {
+  const zip = new AdmZip(buffer);
+  const entry = zip.getEntry("word/document.xml");
+  if (!entry) return "";
+  const xml = entry.getData().toString("utf8");
+  const chunks: string[] = [];
+  const textRe = /<w:t[^>]*>([^<]*)<\/w:t>/g;
+  let match: RegExpExecArray | null;
+  while ((match = textRe.exec(xml)) !== null) {
+    if (match[1]) chunks.push(match[1]);
+  }
+  return chunks.join(" ").replace(/\s+/g, " ").trim();
+}
+
 function isSvgFile(fileName: string, mimeType: string): boolean {
   const lower = fileName.toLowerCase();
   return mimeType === "image/svg+xml" || lower.endsWith(".svg");
@@ -123,6 +148,10 @@ export function extractTextFromBuffer(
   if (lower.endsWith(".zip")) return extractTextFromZip(buffer);
   if (isPdfFile(fileName, mimeType)) {
     const text = extractPdfText(buffer);
+    return text ? [{ path: fileName, text }] : [];
+  }
+  if (isDocxFile(fileName, mimeType)) {
+    const text = extractDocxText(buffer);
     return text ? [{ path: fileName, text }] : [];
   }
   if (isSvgFile(fileName, mimeType)) {

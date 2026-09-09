@@ -21,6 +21,7 @@ export function BoardColumn({
   onDragEnd,
   onDropBeforeTask,
   onDropToEnd,
+  dropBlocked = false,
   canAddTask = false,
   projectId,
   projectRequirements = "",
@@ -41,6 +42,7 @@ export function BoardColumn({
   onDragEnd: () => void;
   onDropBeforeTask: (columnId: string, targetTaskId: string) => void;
   onDropToEnd: (columnId: string) => void;
+  dropBlocked?: boolean;
   projectId?: string;
   projectRequirements?: string;
   reviewAnalysisRaw?: string;
@@ -101,6 +103,10 @@ export function BoardColumn({
 
       <div
         onDragOver={(e) => {
+          if (dropBlocked) {
+            e.dataTransfer.dropEffect = "none";
+            return;
+          }
           e.preventDefault();
           setOver(true);
         }}
@@ -108,14 +114,17 @@ export function BoardColumn({
         onDrop={(e) => {
           e.preventDefault();
           setOver(false);
+          if (dropBlocked) return;
           onDropToEnd(column.id);
         }}
         className={`flex min-h-[140px] flex-1 flex-col gap-2 p-2 transition-colors ${
-          over
-            ? isReview
-              ? "rounded-b-lg bg-brand-500/[0.08] ring-1 ring-inset ring-brand-500/25"
-              : "rounded-b-lg bg-brand-500/[0.06] ring-1 ring-inset ring-brand-500/20"
-            : ""
+          dropBlocked
+            ? "rounded-b-lg bg-red-500/[0.04] ring-1 ring-inset ring-red-500/20"
+            : over
+              ? isReview
+                ? "rounded-b-lg bg-brand-500/[0.08] ring-1 ring-inset ring-brand-500/25"
+                : "rounded-b-lg bg-brand-500/[0.06] ring-1 ring-inset ring-brand-500/20"
+              : ""
         }`}
       >
         {tasks.map((task) => (

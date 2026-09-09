@@ -277,6 +277,15 @@ test("cannot move directly to Done without DeepSeek review", async () => {
     body: { columnId: ctx.doneColumnId, index: 0 },
   });
   assert.equal(blocked.status, 403);
+  assert.equal(blocked.body.hasBeenInReview, false);
+});
+
+test("cannot run DeepSeek review outside the Review column", async () => {
+  const res = await api(`/api/tasks/${ctx.taskId}/review`, {
+    method: "POST",
+    token: ctx.token,
+  });
+  assert.equal(res.status, 400);
 });
 
 test("moving through Review and passing gate completes the task", async () => {

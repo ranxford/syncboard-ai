@@ -64,6 +64,11 @@ tasksRouter.post("/projects/:projectId/tasks", async (req: AuthedRequest, res) =
 
   const column = await prisma.column.findFirst({ where: { id: data.columnId, projectId } });
   if (!column) return res.status(404).json({ error: "Column not found" });
+  if (await isDoneColumn(projectId, data.columnId)) {
+    return res.status(400).json({
+      error: "Tasks cannot be created in Done — move work through Review first.",
+    });
+  }
   if (!canCreateTaskInColumn(column.name)) {
     return res.status(400).json({
       error: "New tasks can only be added in Backlog or To Do — drag cards forward from there.",
@@ -190,18 +195,29 @@ tasksRouter.post("/tasks/:taskId/move", async (req: AuthedRequest, res) => {
   const movingToDone = await isDoneColumn(task.projectId, columnId);
   const movingToReview = await isReviewColumn(task.projectId, columnId);
 
-  if (movingToDone && !task.reviewOverride && task.reviewStatus !== "passed") {
+  const canEnterDone =
+    task.reviewOverride || (task.reviewStatus === "passed" && task.hasBeenInReview);
+
+  if (movingToDone && !canEnterDone) {
+    const needsReviewColumn = !task.hasBeenInReview;
+    const message = needsReviewColumn
+      ? "Tasks must go through Review before Done. Move the card to the Review column first."
+      : task.reviewStatus === "failed"
+        ? "DeepSeek review failed — fix issues and re-submit in Review before moving to Done."
+        : "DeepSeek review must pass before moving to Done. Move the task to Review and wait for approval.";
     if (!isAdminRole(membership?.role)) {
       return res.status(403).json({
-        error:
-          "DeepSeek review must pass before moving to Done. Move the task to Review and wait for approval.",
+        error: message,
         reviewStatus: task.reviewStatus,
+        hasBeenInReview: task.hasBeenInReview,
       });
     }
     return res.status(403).json({
-      error:
-        "Task has not passed DeepSeek review. Use Admin Override in the task panel, or move back to Review.",
+      error: needsReviewColumn
+        ? "Task has not been through Review. Move it to Review first, or use Admin Override in the task panel."
+        : "Task has not passed DeepSeek review. Use Admin Override in the task panel, or move back to Review.",
       reviewStatus: task.reviewStatus,
+      hasBeenInReview: task.hasBeenInReview,
     });
   }
 
@@ -233,7 +249,12 @@ tasksRouter.post("/tasks/:taskId/move", async (req: AuthedRequest, res) => {
         ...(columnChanged ? { enteredColumnAt: new Date() } : {}),
         completedAt: nowDone ? task.completedAt ?? new Date() : null,
         ...(columnChanged && movingToReview
-          ? { reviewStatus: "pending", reviewFeedback: "Queued for DeepSeek review…", reviewOverride: false }
+          ? {
+              reviewStatus: "pending",
+              reviewFeedback: "Queued for DeepSeek review…",
+              reviewOverride: false,
+              hasBeenInReview: true,
+            }
           : {}),
         ...(columnChanged && !movingToReview && !movingToDone && task.reviewStatus !== "none"
           ? { reviewStatus: "none", reviewFeedback: "", reviewOverride: false }
@@ -274,6 +295,13 @@ tasksRouter.post("/tasks/:taskId/move", async (req: AuthedRequest, res) => {
 tasksRouter.post("/tasks/:taskId/review", async (req: AuthedRequest, res) => {
   const loaded = await loadTaskForViewer(req.params.taskId, req.userId!);
   if (!loaded) return res.status(404).json({ error: "Task not found" });
+
+  const inReview = await isReviewColumn(loaded.task.projectId, loaded.task.columnId);
+  if (!inReview) {
+    return res.status(400).json({
+      error: "Move the task to the Review column before running DeepSeek review.",
+    });
+  }
 
   await runTaskReview(loaded.task.id);
   await runProjectReviewAnalysis(loaded.task.projectId);

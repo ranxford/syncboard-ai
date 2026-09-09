@@ -25,6 +25,7 @@ const ALLOWED_MIME = new Set([
   "application/typescript",
   "application/json",
   "application/xml",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
 ]);
 
 const CODE_EXTENSIONS = new Set([
@@ -32,7 +33,7 @@ const CODE_EXTENSIONS = new Set([
   ".py", ".go", ".rs", ".java", ".kt", ".swift",
   ".md", ".html", ".css", ".scss", ".yaml", ".yml", ".json",
   ".vue", ".sql", ".sh", ".rb", ".php", ".cs", ".cpp", ".c", ".h",
-  ".zip",
+  ".zip", ".txt", ".csv", ".docx",
 ]);
 
 export const MAX_FILE_BYTES = 12 * 1024 * 1024; // 12 MB

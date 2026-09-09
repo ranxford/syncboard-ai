@@ -110,7 +110,8 @@ reviewSourcesRouter.post(
     if (!file) return res.status(400).json({ error: "No file uploaded." });
     if (!isAllowedUpload(file.mimetype, file.originalname)) {
       return res.status(400).json({
-        error: "Unsupported file type. Use code (.ts, .py, .js, .md), ZIP, PNG, JPG, PDF, WEBP, or SVG.",
+        error:
+          "Unsupported file type. Use code (.ts, .py, .js, .md), DOCX, ZIP, PNG, JPG, PDF, WEBP, or SVG.",
       });
     }
 
