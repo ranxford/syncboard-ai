@@ -114,6 +114,26 @@ test("create a project and read its default columns", async () => {
   ctx.doneColumnId = done.id;
 });
 
+test("backfills Review column when missing from an older board", async () => {
+  const created = await api("/api/projects", {
+    method: "POST",
+    token: ctx.token,
+    body: { name: "Legacy Business", field: "business" },
+  });
+  assert.equal(created.status, 201);
+  const projectId = created.body.board.project.id;
+  const review = created.body.board.columns.find((c: any) => c.name === "Review");
+  assert.ok(review, "Review should exist after create");
+
+  const { prisma: db } = (await import("../prisma.js")) as typeof import("../prisma.js");
+  await db.column.delete({ where: { id: review.id } });
+
+  const fetched = await api(`/api/projects/${projectId}`, { token: ctx.token });
+  assert.equal(fetched.status, 200);
+  const restored = fetched.body.board.columns.find((c: any) => c.name === "Review");
+  assert.ok(restored, "Review column should be backfilled on board load");
+});
+
 test("create a task with labels and read them back as an array", async () => {
   const created = await api(`/api/projects/${ctx.projectId}/tasks`, {
     method: "POST",

@@ -3,6 +3,7 @@ import { prisma } from "../prisma.js";
 import { parseLabels } from "./labels.js";
 import { isAdminRole } from "./teammates.js";
 import { taskVisibleToViewer } from "./taskVisibility.js";
+import { ensureReviewColumn } from "./columns.js";
 
 export { parseLabels } from "./labels.js";
 
@@ -13,6 +14,8 @@ export async function getBoardState(
   projectId: string,
   opts?: { viewerId?: string },
 ) {
+  await ensureReviewColumn(projectId);
+
   const [project, columns, memberships] = await Promise.all([
     prisma.project.findUnique({ where: { id: projectId } }),
     prisma.column.findMany({
